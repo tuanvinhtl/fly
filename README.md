@@ -26,7 +26,7 @@ descending neurons. Silence them, and the corresponding behaviour disappears
 
 - Full-brain LIF model. Validated against Brian2: spike-for-spike on test circuits, and a
   rate ratio of 0.99 on a 9k-neuron subnetwork. Reproduces Shiu et al.'s sugar → MN9 result.
-- Real-time closed loop at 0.35–0.6× real time on 4 CPU cores, no GPU.
+- Runs in real time: 1.0× with the dashboard streaming (up to 1.3× at max speed; 1.5× headless) on 4 CPU cores, no GPU.
 - Sensing: odour, sugar/bitter taste, temperature, light (ocelli) and head touch, each feeding
   FlyWire-annotated sensory neurons.
 - Motor output from DNp09 (forward), DNa02/DNa01 (steering), MDN (backward), DNp01 (escape) and

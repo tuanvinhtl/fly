@@ -24,11 +24,25 @@ def test_numba_matches_numpy_reference_exactly(sugar_subnet):
     np.testing.assert_allclose(a.v, b.v, atol=1e-12)
 
 
-def test_active_set_matches_dense_integration(sugar_subnet):
-    sub, inp, _ = sugar_subnet
-    dense = _run(sub, inp, "numba", LIFParams(rest_tol=0.0))
-    sparse = _run(sub, inp, "numba", LIFParams(rest_tol=1e-5))
-    np.testing.assert_array_equal(dense.spike_count, sparse.spike_count)
+def test_lazy_kernel_matches_dense_stepping_full_brain(connectome):
+    """The event-driven numba kernel equals dense step-by-step integration (numpy, no
+    rest snapping) on the whole brain, for gustatory and olfactory drive."""
+    ann = connectome.annotations
+    sugar = np.flatnonzero((ann.cell_sub_class == "sugar").to_numpy() & (ann.side == "left").to_numpy())
+    orn = np.flatnonzero(ann.cell_type.isin(["ORN_DM1", "ORN_DM4"]).to_numpy() & (ann.side == "left").to_numpy())
+    for idx in (sugar, orn):
+        out = []
+        for engine in ("numba", "numpy"):
+            b = build_brain(connectome, "al_std", seed=5, engine=engine)
+            b.set_input_rates(idx, np.full(idx.size, 100.0))
+            for _ in range(10):
+                b.step(100)
+            out.append(b)
+        lazy, dense = out
+        assert dense.spike_count.sum() > 100
+        np.testing.assert_array_equal(lazy.spike_count, dense.spike_count)
+        np.testing.assert_allclose(lazy.v, dense.v, atol=1e-12)
+        np.testing.assert_allclose(lazy.g, dense.g, atol=1e-12)
 
 
 def test_depression_with_u_zero_is_the_published_model(sugar_subnet):
@@ -127,4 +141,4 @@ def test_matches_brian2_reference(sugar_subnet):
 
 def test_rest_tolerance_dataclass_default():
     assert dataclasses.fields(LIFParams)  # params are a frozen, documented dataclass
-    assert LIFParams().rest_tol == 1e-5
+    assert LIFParams().rest_tol == 0.0  # no rest snapping by default (exact)

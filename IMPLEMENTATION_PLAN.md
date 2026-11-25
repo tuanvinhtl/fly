@@ -35,7 +35,7 @@ Test totals: 46 tests (45 fast, plus 1 slow Brian2 comparison), all passing.
    needed to prevent a runaway attractor. The unmodified model remains available as `exact`.
 6. **Body simplifications.** 3-DoF legs, increased joint armature, no adhesion, no flight
    aerodynamics (escape is an upward impulse plus a wing raise).
-7. **Speed.** 0.35–0.6× real time on 4 CPU cores. Options: a multi-threaded kernel (the
+7. **Speed.** ✅ Real time reached (1.0× with dashboard, 1.5× headless) on 4 CPU cores. Further options: a multi-threaded kernel (the
    integration loop parallelises trivially), or a GPU backend (the Eon repository benchmarks
    CUDA/GeNN implementations of the same model).
 8. **One organism.** The world and simulation support one fly; a multi-organism ecosystem

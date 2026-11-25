@@ -61,8 +61,8 @@ experimentally validated model.
 |---|---|
 | Load cached connectome | 0.1 s, ~320 MB |
 | Full simulator, peak RSS | ~0.9 GB including one snapshot |
-| Brain speed | 0.5 s of simulated brain in 0.2 s of wall time under sugar stimulation; ~13 ms per 10 ms tick during closed-loop walking |
-| Closed loop | 0.6× real time headless; 0.35–0.5× while streaming to the dashboard |
+| Brain speed | ~4 ms per 10 ms tick during closed-loop walking (exact event-driven kernel, ARCHITECTURE.md) |
+| Closed loop | 1.5× real time headless; 1.0× at the 1× setting and 1.3× at max speed while streaming to the dashboard |
 | GPU | not required. A GPU would allow faster-than-real-time runs and parameter sweeps |
 
 **What needs simplification?**

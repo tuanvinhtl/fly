@@ -20,12 +20,12 @@ small chunks interleaved with physics and to change inputs every chunk; Brian2's
 `Network.run` start-up cost per call makes this impractical on CPU. Brian2 is kept
 as a reference backend (see brian2_ref.py) and the tests compare the two.
 
-Active-set optimisation (optional, on by default): the model has no spontaneous
-activity, so a neuron at exact rest with no incoming events stays at rest. We only
-integrate neurons that are away from rest; a neuron whose |v - v_0| and |g| both
-fall below `rest_tol` is snapped to rest. With rest_tol = 1e-5 V this changes
-membrane potentials by at most 10 µV (700x below the 7 mV spike-threshold gap); the
-tests check that spike output is unchanged on validated pathways.
+Engines:
+  numba (default) — exact lazy integration (see _lif_kernel.py): neurons whose analytic
+      upper bound on future membrane potential stays below threshold are advanced in
+      closed form only when they receive input; only near-threshold neurons are stepped.
+  numpy — dense step-by-step reference. Optional `rest_tol` snaps neurons within that
+      distance of rest (off by default). Tests check the engines agree.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ class LIFParams:
     w_syn: float = 0.275e-3  # weight per synapse — FREE PARAMETER fit by Shiu et al.
     f_poi: float = 250.0  # Poisson input scaling (one event forces a spike)
     dt: float = 1e-4  # Brian2 default clock
-    rest_tol: float = 1e-5  # active-set snap tolerance, V (0 disables the optimisation)
+    rest_tol: float = 0.0  # NumPy reference engine only: optional rest-snapping tolerance (V)
     # --- EXTENSION (not in Shiu et al.): short-term synaptic depression -------------
     # Tsodyks-Markram resource model per presynaptic neuron. std_U = 0 disables it and
     # recovers the published model exactly. See RESEARCH.md §4 for why it is needed.
@@ -78,7 +78,8 @@ class LIFState:
 
 @dataclass
 class StepResult:
-    spikes: list[np.ndarray] = field(default_factory=list)  # spike indices per step
+    spikes: list[np.ndarray] = field(default_factory=list)  # spike indices per step (record=True)
+    flat: np.ndarray | None = None  # all spike indices of the chunk (None if the buffer overflowed)
 
 
 class LIFBrain:
@@ -106,6 +107,16 @@ class LIFBrain:
         self.g_to_v = float(p.tau / (p.tau - p.t_mbr) * (self.decay_g - self.decay_v))
         self.base_w = connectome.counts.astype(np.float64) * p.w_syn
         self.poisson_w = p.w_syn * p.f_poi
+        # closed-form propagators for the lazy (event-driven) numba kernel
+        d = np.arange(20_000, dtype=np.float64) * p.dt
+        self.gv_coef = p.tau / (p.tau - p.t_mbr)
+        self.dv_tab = np.exp(-d / p.t_mbr)
+        self.dg_tab = np.exp(-d / p.tau)
+        self.gv_tab = self.gv_coef * (self.dg_tab - self.dv_tab)
+        a_, b_ = 1.0 / p.t_mbr, 1.0 / p.tau
+        s_peak = np.log(b_ / a_) / (b_ - a_)
+        self.m_peak = float(np.exp(-a_ * s_peak) - np.exp(-b_ * s_peak))  # max of e^-as - e^-bs
+        self.c_coef = p.tau / (p.t_mbr - p.tau)
         self.seed = seed
         self.input_idx = np.zeros(0, dtype=np.int64)
         self.input_rate = np.zeros(0, dtype=np.float64)
@@ -284,9 +295,11 @@ class LIFBrain:
                 self.g[quiet] = 0.0
                 self.active[quiet] = False
                 self.active[spk] = True
-            if record:
-                res.spikes.append(spk)
+            res.spikes.append(spk)
             self.t_step += 1
+        res.flat = np.concatenate(res.spikes) if res.spikes else np.zeros(0, dtype=np.int64)
+        if not record:
+            res.spikes = []
         return res
 
     def _rebuild_touched(self) -> None:
@@ -310,12 +323,14 @@ class LIFBrain:
         is_input[self.input_idx] = True
         if events is None:
             events = np.zeros((n_steps, 0), dtype=np.int32)
-        spk_out = np.empty(max(4096, n_steps * 256), dtype=np.int32)
+        spk_out = np.empty(max(65536, n_steps * 1024), dtype=np.int32)
         spk_ptr = np.zeros(n_steps + 1, dtype=np.int64)
         truncated = lif_steps(
             n_steps, self.t_step, self.delay_steps, self.rfc_steps,
             p.v_0, p.v_rst, p.v_th, self.decay_v, self.decay_g, self.g_to_v, self.poisson_w,
-            p.rest_tol, self.std_u, p.dt / p.std_tau_rec, self.c.indptr, self.c.indices, self._w,
+            self.std_u, p.dt / p.std_tau_rec,
+            self.dv_tab, self.dg_tab, self.gv_tab, p.dt / p.t_mbr, p.dt / p.tau, self.gv_coef, self.c_coef, self.m_peak,
+            self.c.indptr, self.c.indices, self._w,
             self.input_idx, events, is_input,
             self.v, self.g, self.ref_until, self.buffer,
             self._bt_idx, self._bt_n, self._bt_flag, self.active, self.spike_count,
@@ -325,7 +340,7 @@ class LIFBrain:
         if truncated and record:
             log.warning("spike record buffer full: per-step spike lists truncated (counts are exact)")
         self.t_step += n_steps
-        res = StepResult()
+        res = StepResult(flat=None if truncated else spk_out[: spk_ptr[n_steps]].astype(np.int64))
         if record:
             res.spikes = [spk_out[spk_ptr[k]:spk_ptr[k + 1]].astype(np.int64) for k in range(n_steps)]
         return res

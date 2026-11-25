@@ -131,6 +131,8 @@ class Simulation:
         self.command_log: list[dict] = []
         self.events: list[SimEvent] = []
         self._prev_counts = np.zeros(self.brain.n, dtype=np.int64)
+        self._delta = np.zeros(self.brain.n, dtype=np.int64)
+        self._delta_nz = np.zeros(0, dtype=np.int64)
         self.motor_rates = {k: 0.0 for k in self.motor_pops}
         self.sensory_rates = {k: 0.0 for k in self.sensory_pops}
         self.last_reading = SensoryReading()
@@ -270,15 +272,24 @@ class Simulation:
             brain.set_input_rates(np.zeros(0, dtype=np.int64), np.zeros(0))
 
         # 3. brain
-        brain.step(self.steps_per_tick)
-        delta = brain.spike_count - self._prev_counts
-        self._prev_counts = brain.spike_count.copy()
-        nz = np.flatnonzero(delta)
-        self.tick_active_idx, self.tick_active_cnt = nz, delta[nz]
-        self.frame_counts[nz] += delta[nz]
-        self.total_spikes_tick = int(delta[nz].sum())
+        res = brain.step(self.steps_per_tick)
+        if res.flat is not None:
+            nz, cnt = np.unique(res.flat, return_counts=True)
+            self._prev_counts[nz] += cnt
+        else:  # spike list overflowed: fall back to diffing cumulative counters
+            full = brain.spike_count - self._prev_counts
+            nz = np.flatnonzero(full)
+            cnt = full[nz]
+            self._prev_counts = brain.spike_count.copy()
+        delta = self._delta
+        delta[self._delta_nz] = 0
+        delta[nz] = cnt
+        self._delta_nz = nz
+        self.tick_active_idx, self.tick_active_cnt = nz, cnt
+        self.frame_counts[nz] += cnt
+        self.total_spikes_tick = int(cnt.sum())
         alpha = 1 - math.exp(-self.TICK / self.rate_tau)
-        inst = np.bincount(self.cluster_id[nz], weights=delta[nz], minlength=len(self.cluster_names))
+        inst = np.bincount(self.cluster_id[nz], weights=cnt, minlength=len(self.cluster_names))
         self.cluster_rates += alpha * (inst / self.cluster_sizes / self.TICK - self.cluster_rates)
         silenced = brain.silenced
         for key, pop in self.motor_pops.items():
@@ -395,6 +406,8 @@ class Simulation:
         self.stim_expiry = dict(snap["stim_expiry"])
         self.motor_rates = dict(snap["motor_rates"])
         self._prev_counts = snap["prev_counts"].copy()
+        self._delta[:] = 0
+        self._delta_nz = np.zeros(0, dtype=np.int64)
         self._latch = dict(snap["latch"])
         self.last_cmd = snap["last_cmd"]
         self.habituation.gains = dict(snap["habituation"])

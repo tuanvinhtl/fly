@@ -80,9 +80,14 @@ integrated exactly) and is validated against Brian2: spike-for-spike on small ci
 and a downstream spike-count ratio of 0.99 on a 9,270-neuron subnetwork (`tests/test_lif.py`).
 A NumPy reference engine is kept, and the tests check that the two engines give identical results.
 
-**Active-set integration.** The model has no spontaneous activity, so only neurons away
-from rest are integrated. Neurons within 10 µV of rest are snapped back to rest. Tests check
-that spike output equals that of dense integration.
+**Exact event-driven integration.** Between inputs each neuron follows a linear ODE with
+a closed-form solution, u(s) = u₀e^(−s/τm) + C(e^(−s/τm) − e^(−s/τ)) with C = g₀τ/(τm − τ).
+Since the bracket never exceeds M ≈ 0.472, max(u₀,0) + max(C,0)·M is an exact upper bound on
+all future membrane potential. Neurons whose bound is below threshold ("cold") cannot spike
+until new input arrives, so they are advanced in closed form only when input arrives (using
+precomputed propagator tables). Only near-threshold ("hot") neurons, typically fewer than
+100, are stepped every 0.1 ms. No approximation is involved: the test suite checks identical spike
+counts against dense step-by-step integration on the whole brain.
 
 **A simplified body instead of NeuroMechFly.** Six 3-DoF legs, wings, proboscis, built in
 mm/mg/s units. Joint armature is raised far above the real segment inertia so that a
@@ -119,11 +124,12 @@ has been tested with `DLL_TEST_DATABASE_URL=postgresql+psycopg://…`.
 
 | Component | Cost per 10 ms tick |
 |---|---|
-| Brain (138,639 neurons, typical activity of 30–45k spikes/s) | ~13 ms |
+| Brain (138,639 neurons, typical activity of 30–45k spikes/s) | ~4–5 ms |
 | MuJoCo (50 steps) | ~1.4 ms |
 | Sensors, VNC, physiology, events | ~1 ms |
 
-That gives about 0.6× real time headless and 0.35–0.5× while streaming to the dashboard.
+That gives 1.5× real time headless. With the dashboard streaming in a browser on the same
+4 cores: exactly 1.0× at the 1× setting and 1.3× at max speed (measured over 15 s).
 Peak memory is about 0.9 GB with one snapshot. Disk: 130 MB raw data plus 240 MB cache.
 
 ## API summary
