@@ -32,6 +32,9 @@ descending neurons. Silence them, and the corresponding behaviour disappears
 - Motor output from DNp09 (forward), DNa02/DNa01 (steering), MDN (backward), DNp01 (escape) and
   MN9 (proboscis), through a tripod-gait VNC approximation.
 - Feeding loop: food contact → sugar neurons → MN9 → proboscis → energy. It fails when MN9 is silenced.
+- Associative learning (experimental, `ln_std` preset): odour paired with sugar becomes attractive. The memory forms in
+  mushroom-body synapses, and a labelled valence readout turns it into approach. Trained flies spend 57% of the time near the
+  learned odour; naive flies and flies given odourless sugar spend 0%.
 - Escape flight: a swooping predator is seen by looming-sensitive LC4/LPLC2 neurons; the connectome
   drives the DNp01 giant fiber, and the fly takes off, flies and lands. With DNp01 silenced, it is caught.
 - Live dashboard: 3D world with click-to-place objects; Brain Explorer with all neurons at
@@ -48,8 +51,8 @@ Read [RESEARCH.md §4–§7](RESEARCH.md) before drawing conclusions. In short:
 - **The unmodified model saturates on olfactory input.** Any odour or temperature input
   ignites a self-sustaining whole-brain attractor. The default `al_std` preset adds short-term
   depression in the olfactory system to prevent this; `exact` keeps the published model.
-- **No food-seeking emerges.** In controlled runs, food odour made the fly *less* likely to
-  reach food (mean distance 13.4 vs 7.7 mm). The model also has an intrinsic right-turn bias.
+- **No innate food-seeking emerges** from the connectome alone; odour approach appears only after learning, via the
+  approximate valence readout. The model also has intrinsic turning biases (right DNa02 under DNp09 drive; left under odour).
 - **The VNC is approximated.** The brain connectome stops at the neck.
 
 ![Brain Explorer](docs/brain.png)

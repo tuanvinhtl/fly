@@ -202,8 +202,8 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
           )}
           <p className="text-faint text-[11px]">
             Use the <span className="text-ink">ln_std</span> preset (New experiment, below): with the default preset the mushroom body is nearly silent.
-            Memories form in the mushroom body output (MBON response to the trained odour drops to ~45%), but do not yet change motor output — see
-            RESEARCH.md §6b.
+            Try: reset with ln_std, enable both switches, let the fly feed on scented food, then move the food away — trained flies return to the
+            odour (57% of time near it vs 0% for naive flies; RESEARCH.md §6b–c).
           </p>
         </div>
       </Card>

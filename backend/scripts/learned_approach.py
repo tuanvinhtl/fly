@@ -7,6 +7,7 @@ in which the fly walks freely and an odour-only source (same odour, no sugar) si
   trained          : training on sugar food that emits the odour; plasticity + readout on
   naive            : same phases but no food during training;    plasticity + readout on
   trained_noreadout: as trained but the valence readout off (plasticity only)
+  unpaired_sugar   : training on odourless sugar food (reward without the odour)
 Metric: mean / minimum distance to the odour source and time within 4 mm.
 """
 
@@ -29,7 +30,7 @@ from dll.config import load_settings  # noqa: E402
 from dll.environment.world import WorldConfig  # noqa: E402
 from dll.sim.simulation import Simulation  # noqa: E402
 
-CONDITIONS = ("trained", "naive", "trained_noreadout")
+CONDITIONS = ("trained", "naive", "trained_noreadout", "unpaired_sugar")
 
 
 def run(args: tuple[str, int, float, str]) -> dict:
@@ -43,7 +44,8 @@ def run(args: tuple[str, int, float, str]) -> dict:
     sim.run(0.1)
     lab = sim.body.site_pos("labellum")
     if cond != "naive":
-        sim.submit({"op": "world.add", "kind": "food", "object": {"id": "train", "x": float(lab[0]), "y": float(lab[1]), "radius": 2.0, "odor": 1.0, "odor_sigma": 12.0, "amount": 1000}})
+        odor = 0.0 if cond == "unpaired_sugar" else 1.0
+        sim.submit({"op": "world.add", "kind": "food", "object": {"id": "train", "x": float(lab[0]), "y": float(lab[1]), "radius": 2.0, "odor": odor, "odor_sigma": 12.0, "amount": 1000}})
     sim.run(6.0)
     if cond != "naive":
         sim.submit({"op": "world.remove", "id": "train"})

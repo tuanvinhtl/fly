@@ -36,7 +36,7 @@ _PHASE_OFFSET = {"L1": 0.0, "R2": 0.0, "L3": 0.0, "R1": math.pi, "L2": math.pi, 
 @dataclass(frozen=True)
 class VNCParams:
     rate_ref: float = 60.0  # Hz; DN rate giving full command (DNp09 under drive fires 60-80 Hz)
-    turn_ref: float = 30.0  # Hz of left-right DNa difference for full turn
+    turn_ref: float = 30.0  # Hz of left-right DNa difference giving raw turn 1 (turn = tanh(raw) ~ 0.76)
     f_max: float = 8.0  # stepping frequency at full drive (Hz); real flies 5-15 Hz
     swing_amp: float = 0.45  # rad coxa yaw amplitude
     lift_amp: float = 0.5  # rad coxa pitch lift during swing
@@ -58,6 +58,7 @@ class MotorCommand:
     proboscis: float  # 0..1 extension
     flying: bool = False
     flight_power: float = 0.0  # 0..1
+    raw_turn: float = 0.0  # unsaturated steering drive; turn = tanh(raw_turn)
 
 
 class VNC:
@@ -101,11 +102,14 @@ class VNC:
         steer_l = rates["dn_steer_high_left"] + 0.3 * rates["dn_steer_low_left"]
         steer_r = rates["dn_steer_high_right"] + 0.3 * rates["dn_steer_low_right"]
         forward = float(np.clip((fwd - bwd) / p.rate_ref, -1.0, 1.0))
-        turn = float(np.clip((steer_l - steer_r) / p.turn_ref, -1.0, 1.0))
+        # soft saturation (tanh) instead of a hard clip, so additional steering inputs
+        # still act when the DN drive is strong (premotor summation before saturation)
+        raw_turn = (steer_l - steer_r) / p.turn_ref
+        turn = float(np.tanh(raw_turn))
         escape = max(rates["dn_escape_left"], rates["dn_escape_right"]) > p.escape_threshold
         mn9 = max(rates["mn_proboscis_left"], rates["mn_proboscis_right"])
         proboscis = float(np.clip(mn9 / (4 * p.proboscis_threshold), 0.0, 1.0))
-        return MotorCommand(forward, turn, escape, proboscis)
+        return MotorCommand(forward, turn, escape, proboscis, raw_turn=float(raw_turn))
 
     def joint_targets(self, cmd: MotorCommand, dt: float) -> dict[str, float]:
         """Advance the CPG by dt and return position targets per actuator (radians)."""

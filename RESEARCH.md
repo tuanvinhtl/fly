@@ -223,18 +223,20 @@ raw data in `docs/results/`):
 
 | Condition | Mean distance to food | Time within 4 mm | Food eaten | Walked | Time turning right |
 |---|---|---|---|---|---|
-| food odour on | 13.4 ± 3.7 mm | 2% | 1.2 ± 2.5 | 176 mm | 42% |
-| food odour off | 7.7 ± 1.5 mm | 19% | 11.9 ± 10.4 | 169 mm | 40% |
-| odour on, DNp09 silenced | 10.0 mm (stationary) | 0% | 0 | 0.5 mm | 0% |
+| food odour on | 10.5 ± 3.7 mm | 7% | 3.5 ± 5.1 | 168 mm | 40% |
+| food odour off | 9.4 ± 2.9 mm | 11% | 4.7 ± 4.3 | 173 mm | 42% |
+| odour on, DNp09 silenced | 10.0 mm (stationary) | 0% | 0 | 0.4 mm | 0% |
+
+(Measured with the soft-saturating VNC turn mapping used since the learning work. With the earlier
+hard-clipped mapping, odour-on flies ended farther from food: 13.4 vs 7.7 mm.)
 
 Interpretation:
-- **No chemotaxis emerges.** Odour input makes the fly *less* likely to reach the
-  food. Without odour, the intrinsic right-turn bias (DNp09 → right DNa02, §5) keeps the fly
-  circling near its start point, 10 mm from the food, so it crosses the food often. Odour
-  input changes DNp09/DNa02 activity enough that the circles drift away.
-- The persistent circling is a **prediction of the uncalibrated model** (and of our DN
-  mapping), not observed fly behaviour.
-- Feeding on contact works and is causally dependent on MN9.
+- **No innate chemotaxis emerges.** Odour does not bring the fly closer to food: the
+  difference is within seed-to-seed variation.
+- An intrinsic right-turn bias (DNp09 → right DNa02, §5) makes flies circle near their start
+  point, so contact with food 10 mm away is partly chance.
+- Feeding on contact works and depends causally on MN9.
+- Odour approach does appear **after associative learning**, via the valence readout (§6c).
 
 These are the expected limits of a connectome-constrained model with uniform synaptic
 weights, no neuromodulation, an approximate VNC and a hand-chosen DN mapping. We report
@@ -274,26 +276,46 @@ cholinergic/GABAergic MBONs mostly drive approach (Aso et al. 2014b). The two gr
 balanced on a panel of 6 naive odours. The resulting signal steers toward (V > 0) or away from
 (V < 0) the antenna that smells the odour more strongly.
 
-**Learned approach test** (`scripts/learned_approach.py`, 5 seeds; 6 s held on scented sugar
-food, then 30 s free walking with an odour-only source 10 mm away) [measured]:
+Steering from the readout is summed with the descending-neuron steering drive **before**
+the VNC's soft saturation (turn = tanh(raw)). It is not added after a hard clip.
 
-| preset | condition | MB valence V after training | mean distance to odour |
+**Forced-valence check of the steering mechanics** (V held fixed, 3 seeds × 20 s, odour 10 mm
+away) [measured]:
+
+| preset, readout gains | V = +1 | V = −1 | V = 0 |
 |---|---|---|---|
-| `ln_std` | trained | **+0.64 … +0.88** | 12.6 ± 0.7 mm |
-| `ln_std` | naive | −1.3 … −1.6 | 9.0 ± 0.5 mm |
-| `ln_std` | trained, readout off | — | 9.9 ± 0.4 mm |
-| `al_std` | trained / naive | ≈ 0 (only ~490 synapses change) | 11.6 / 11.6 mm |
+| `al_std`, gain 2 / contrast 60 | 4.9 mm | 33.4 mm | 12.1 mm |
+| `ln_std`, gain 2 / contrast 60 | 11.2 mm | 10.3 mm | 10.5 mm (spins left 99%) |
+| `ln_std`, **gain 3 / contrast 300** (default) | **4.0 mm** | **33.4 mm** | — |
 
-- **Learning reliably reverses the odour's value** (`ln_std`, 5/5 seeds): naive flies find this
-  food odour aversive in MBON terms, and reward training makes it attractive.
-- **The behavioural test fails, for identified reasons rather than chance:**
-  - Under `ln_std`, odour drives a saturated left turn. The cause is mutual inhibition between the
-    two AOTU019 neurons, which is asymmetric in the connectome: left → right DNa02 has 216 synapses,
-    right → left has 121. Steering added in the saturated direction is clipped, so the readout acts
-    only one way and the trained flies end up farther away.
-  - Under `al_std`, the mushroom body is too quiet for learning to change V.
-- The memory → valence part therefore works. Turning it into learned approach first needs
-  the odour-evoked steering asymmetry resolved; options are listed in IMPLEMENTATION_PLAN.md.
+Under `ln_std`, odour drives left DNa02 to ~50 Hz. The cause is AOTU019 mutual inhibition,
+which is asymmetric in the connectome: left → right DNa02 has 216 synapses, right → left has 121.
+The readout must be strong enough to override this, and the antennae sit only ~0.2 mm apart, so
+the left/right odour contrast is ~0.4% and needs a high contrast gain. Both settings are
+approximations.
+
+**Learned approach** (`scripts/learned_approach.py`, `ln_std`, 5 seeds; 6 s held on sugar food,
+then 30 s free walking with an odour-only source 10 mm away; raw data in `docs/results/`)
+[measured]:
+
+| condition | MB valence V at end | mean distance | time within 4 mm |
+|---|---|---|---|
+| **trained** (scented sugar, plasticity + readout) | **+0.96 … +1.19** | **4.5 ± 0.2 mm** | **57 ± 13%** |
+| naive (no training) | −0.24 … +0.13 | 23.8 ± 0.3 mm | 0% |
+| unpaired sugar (odourless sugar) | +0.02 … +0.14 | 22.7 mm | 0% |
+| trained, readout off | — | 10.7 ± 0.4 mm | 0% |
+
+- **Learned, associative odour approach emerges.** Only flies that experienced the odour
+  together with sugar approach it. Odourless sugar (reward without the odour) produces no
+  approach, and the memory sits in the KC→MBON synapses (~6,200 depressed).
+- Naive flies (and the unpaired group) move away. While they smell it, this food odour has negative MB
+  valence for them (−1.3 to −1.6 in the earlier run with weaker gains), so they steer away. V then decays
+  toward 0 once they are far from the source. Odour exposure alone also causes some non-associative
+  depression (~2,400 synapses), because odour weakly activates DANs.
+- **What is connectome and what is not:** odour coding, Kenyon cells, MBON responses and the
+  site and specificity of the memory come from the connectome model. The reinforcement signal
+  (taste → DANs), the learning rule, the valence sign rule and the valence → steering link are
+  approximations based on the literature.
 
 ## 7. Limitations and open questions
 

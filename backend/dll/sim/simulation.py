@@ -330,7 +330,8 @@ class Simulation:
         if self.valence_on and self.valence is not None and org.alive:
             # APPROXIMATION: MB valence -> odour-guided steering (learning/valence.py)
             bias = self.valence.steering(reading.physical.get("odor_left", 0.0), reading.physical.get("odor_right", 0.0))
-            cmd.turn = float(np.clip(cmd.turn + bias, -1.0, 1.0))
+            cmd.raw_turn += bias  # summed with DN steering before saturation
+            cmd.turn = float(np.tanh(cmd.raw_turn))
         st0 = body.state()
         before = st0.position
         was_flying = self.vnc.flying

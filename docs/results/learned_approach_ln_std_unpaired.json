@@ -1,0 +1,57 @@
+[
+ {
+  "condition": "unpaired_sugar",
+  "seed": 0,
+  "mean_dist": 22.88327675641748,
+  "min_dist": 10.004774917704236,
+  "frac_near": 0.0,
+  "depressed": 2327,
+  "valence_end": 0.014757703212161896,
+  "mean_abs_steer": 1.4403192648963825,
+  "walked": 168.66258409496768
+ },
+ {
+  "condition": "unpaired_sugar",
+  "seed": 1,
+  "mean_dist": 22.96129540479185,
+  "min_dist": 10.100116830216628,
+  "frac_near": 0.0,
+  "depressed": 2351,
+  "valence_end": 0.14121570005755046,
+  "mean_abs_steer": 1.4427447867033576,
+  "walked": 167.7334740442311
+ },
+ {
+  "condition": "unpaired_sugar",
+  "seed": 2,
+  "mean_dist": 22.628762751726757,
+  "min_dist": 9.990252025926459,
+  "frac_near": 0.0,
+  "depressed": 2391,
+  "valence_end": 0.04579489685359086,
+  "mean_abs_steer": 1.3996563978154606,
+  "walked": 163.6829986228219
+ },
+ {
+  "condition": "unpaired_sugar",
+  "seed": 3,
+  "mean_dist": 22.559664133888877,
+  "min_dist": 10.00572708465076,
+  "frac_near": 0.0,
+  "depressed": 2293,
+  "valence_end": 0.08916746018501076,
+  "mean_abs_steer": 1.311356065328182,
+  "walked": 161.85188669721637
+ },
+ {
+  "condition": "unpaired_sugar",
+  "seed": 4,
+  "mean_dist": 22.62748744954743,
+  "min_dist": 9.99982304444019,
+  "frac_near": 0.0,
+  "depressed": 2506,
+  "valence_end": 0.023105385027879448,
+  "mean_abs_steer": 1.391086297226073,
+  "walked": 165.9587308524978
+ }
+]

@@ -59,7 +59,7 @@
    Poisson input → reset.
 5. **Read out** motor populations: exponentially filtered rates (τ = 50 ms). A silenced DN or MN
    contributes nothing.
-6. **VNC**: forward = (DNp09 − MDN)/60 Hz; turn = (DNa02 + 0.3·DNa01)<sub>L−R</sub>/30 Hz;
+6. **VNC**: forward = (DNp09 − MDN)/60 Hz; turn = tanh((DNa02 + 0.3·DNa01)<sub>L−R</sub>/30 Hz + optional MB-valence steering);
    escape = DNp01 > 20 Hz; proboscis = MN9/20 Hz. A tripod CPG converts these into 18 leg joint
    targets plus the proboscis and wing actuators. A DNp01 burst switches to **flight**: a
    jump impulse, then quasi-steady lift, thrust and drag with PD attitude control. Power comes

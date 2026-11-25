@@ -70,8 +70,9 @@ def test_vnc_maps_dn_rates():
     assert vnc.command(base).forward == 0
     assert vnc.command({**base, "dn_forward_left": 60, "dn_forward_right": 60}).forward == 1.0
     assert vnc.command({**base, "dn_backward_left": 60, "dn_backward_right": 60}).forward == -1.0
-    assert vnc.command({**base, "dn_steer_high_left": 30}).turn == 1.0
-    assert vnc.command({**base, "dn_steer_high_right": 15}).turn == -0.5
+    assert abs(vnc.command({**base, "dn_steer_high_left": 30}).turn - math.tanh(1.0)) < 1e-9
+    assert abs(vnc.command({**base, "dn_steer_high_right": 15}).turn - math.tanh(-0.5)) < 1e-9
+    assert vnc.command({**base, "dn_steer_high_left": 300}).turn < 1.0  # soft saturation
     assert vnc.command({**base, "dn_escape_left": 30}).escape
     assert vnc.command({**base, "mn_proboscis_right": 20}).proboscis == 1.0
 

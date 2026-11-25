@@ -17,6 +17,7 @@ Readout:
     k_app, k_av calibrated so that naive responses to a panel of odours average to
     V = 0 (stored per preset in data/cache).
     turn_bias = gain * tanh(V / v_ref) * clip(lateral_odour_contrast * contrast_gain, -1, 1)
+    added to the VNC's raw steering drive before its tanh saturation (body/vnc.py).
 
 Only the steering command is affected, and only while odour is sensed.
 """
@@ -50,8 +51,8 @@ CALIBRATION_ODOURS = [
 class ValenceParams:
     tau: float = 0.3  # s, smoothing of the valence signal
     v_ref: float = 0.15  # valence (normalised units) giving ~76% of max steering
-    gain: float = 0.9  # max steering added (turn units, -1..1)
-    contrast_gain: float = 60.0  # left/right relative odour difference -> lateral cue
+    gain: float = 3.0  # max steering added, in raw (pre-tanh) VNC turn units
+    contrast_gain: float = 300.0  # left/right relative odour difference -> lateral cue (antennae ~0.2 mm apart)
     odour_floor: float = 0.02  # concentration below which no odour is sensed
 
 

@@ -47,3 +47,15 @@ def test_feeding_releases_dopamine_and_changes_synapses(connectome):
     assert sim.plasticity.dopamine.max() > 0 or sim.plasticity.n_updates > 0
     sim.reset()
     assert sim.plasticity.summary()["depressed"] == 0  # reset clears memory
+
+
+@pytest.mark.slow
+def test_learned_odour_approach_is_associative():
+    """Odour+sugar training -> approach to the odour alone; odourless sugar does not."""
+    from scripts.learned_approach import run
+
+    trained = run(("trained", 0, 20.0, "ln_std"))
+    unpaired = run(("unpaired_sugar", 0, 20.0, "ln_std"))
+    assert trained["valence_end"] > 0.5
+    assert trained["mean_dist"] < 7.0 and trained["frac_near"] > 0.2
+    assert unpaired["mean_dist"] > 12.0 and unpaired["frac_near"] == 0.0
