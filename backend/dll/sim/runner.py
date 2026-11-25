@@ -112,7 +112,15 @@ class SimulationRunner:
             self.recorder.flush(self.sim)
             self._publish()
 
-    def reset(self, seed: int | None = None, world=None, name: str = "experiment", preset: str | None = None) -> int:
+    def reset(
+        self,
+        seed: int | None = None,
+        world=None,
+        name: str = "experiment",
+        preset: str | None = None,
+        memory: np.ndarray | None = None,
+        params: dict | None = None,
+    ) -> int:
         with self.lock:
             self.running = False
             self.recorder.flush(self.sim, final=True)
@@ -122,8 +130,11 @@ class SimulationRunner:
                 self.sim.preset = preset
                 self.sim.brain = build_brain(self.sim.c, preset, seed or self.sim.seed, self.sim.engine)
             self.sim.reset(seed=seed, world=world)
+            if memory is not None:
+                self.sim.import_memory(memory)
+                self.sim.events.clear()  # the loaded memory is an initial condition, not an event
             self._events_sent = 0
-            exp_id = self.recorder.start(self.sim, name)
+            exp_id = self.recorder.start(self.sim, name, params)
             self._publish()
             return exp_id
 

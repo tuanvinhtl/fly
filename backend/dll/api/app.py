@@ -19,6 +19,7 @@ from ..brain.presets import PRESETS
 from ..config import Settings, load_settings
 from ..environment.world import WorldConfig
 from ..experiment.db import Event, Experiment, Sample, make_engine, make_sessionmaker
+from ..experiment.memory import delete_memory, list_memories, load_memory, save_memory
 from ..experiment.recorder import Recorder, load_commands
 from ..experiment.replay import compare_trajectories, rerun
 from ..sim.runner import SimulationRunner
@@ -34,6 +35,12 @@ class ResetRequest(BaseModel):
     preset: Literal["exact", "al_std", "ln_std"] | None = None
     world: WorldConfig | None = None
     default_world: bool = False
+    memory_id: int | None = Field(None, description="start with a saved mushroom-body memory")
+    keep_memory: bool = Field(False, description="carry the current memory into the new experiment")
+
+
+class MemorySaveRequest(BaseModel):
+    name: str = Field("memory", max_length=200)
 
 
 class SpeedRequest(BaseModel):
@@ -63,6 +70,7 @@ class LearningRequest(BaseModel):
     habituation: bool | None = None
     plasticity: bool | None = None
     valence: bool | None = None
+    forget_tau_s: float | None = Field(None, ge=0, le=86400, description="memory decay time constant; 0 = no forgetting")
 
 
 class OrganismRequest(BaseModel):
@@ -159,8 +167,40 @@ def create_app(settings: Settings | None = None, connectome: Connectome | None =
         from ..environment.world import default_world
 
         world = req.world or (default_world() if req.default_world else None)
-        exp_id = runner().reset(seed=req.seed, world=world, name=req.name, preset=req.preset)
-        return {"experiment_id": exp_id}
+        r = runner()
+        memory_id = req.memory_id
+        if req.keep_memory and memory_id is None:
+            with r.lock:
+                info = save_memory(app.state.sessions, r.sim, f"carried from experiment {r.recorder.experiment_id}", r.recorder.experiment_id)
+            memory_id = info["id"]
+        memory = None
+        if memory_id is not None:
+            try:
+                memory = load_memory(app.state.sessions, memory_id, r.sim.memory_signature())
+            except (KeyError, ValueError) as exc:
+                raise HTTPException(404 if isinstance(exc, KeyError) else 409, str(exc)) from exc
+        params = {"memory_id": memory_id} if memory_id is not None else None
+        exp_id = r.reset(seed=req.seed, world=world, name=req.name, preset=req.preset, memory=memory, params=params)
+        return {"experiment_id": exp_id, "memory_id": memory_id}
+
+    # ------------------------------------------------------------ memories (level 2)
+    @app.get("/api/memories")
+    def memories() -> list[dict]:
+        return list_memories(app.state.sessions)
+
+    @app.post("/api/memories")
+    def save_current_memory(req: MemorySaveRequest) -> dict:
+        r = runner()
+        with r.lock:
+            return save_memory(app.state.sessions, r.sim, req.name, r.recorder.experiment_id)
+
+    @app.delete("/api/memories/{memory_id}")
+    def remove_memory(memory_id: int) -> dict:
+        try:
+            delete_memory(app.state.sessions, memory_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return {"ok": True}
 
     # ------------------------------------------------------------ world
     @app.get("/api/world")
@@ -371,11 +411,18 @@ def create_app(settings: Settings | None = None, connectome: Connectome | None =
             recorded = [(r.t, r.x, r.y) for r in rec]
             seed, preset, world = e.seed, e.preset, e.initial_world
             engine = e.params.get("engine", "numba")
+            memory_id = e.params.get("memory_id")
         duration = min(req.max_seconds, recorded[-1][0] if recorded else 0.0)
         if duration <= 0:
             raise HTTPException(400, "experiment has no recorded samples")
         cmds = load_commands(app.state.sessions, exp_id)
-        _, traj = await asyncio.to_thread(rerun, app.state.connectome, seed, preset, world, cmds, duration, engine)
+        memory = None
+        if memory_id is not None:
+            try:
+                memory = load_memory(app.state.sessions, memory_id, runner().sim.memory_signature())
+            except KeyError as exc:
+                raise HTTPException(409, f"initial memory {memory_id} of this experiment was deleted") from exc
+        _, traj = await asyncio.to_thread(rerun, app.state.connectome, seed, preset, world, cmds, duration, engine, 10, memory)
         recorded = [r for r in recorded if r[0] <= duration + 1e-9]
         return {"experiment_id": exp_id, "seconds": duration, **compare_trajectories(recorded, traj)}
 

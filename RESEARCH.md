@@ -317,6 +317,33 @@ then 30 s free walking with an odour-only source 10 mm away; raw data in `docs/r
   (taste → DANs), the learning rule, the valence sign rule and the valence → steering link are
   approximations based on the literature.
 
+### 6d. Memory across experiments and forgetting ("level 2")
+
+The KC→MBON weight scales (62,261 values) can be saved to the database and loaded into later
+experiments (`experiment/memory.py`, `/api/memories`, reset with `memory_id` or
+`keep_memory`). A memory is accepted only if its plastic-synapse signature matches the
+connectome. The experiment records which memory it started from, so deterministic replay still
+works. Optional passive forgetting relaxes weights back to 1 with a time constant τ; it is exact
+exponential decay, runs whether or not learning is on, and is a phenomenological
+[approximation] of memory decay.
+
+**Retention test** (`scripts/memory_retention.py`, `ln_std`, 3 seeds). Experiment 1 is 6 s of
+training on scented sugar. Experiment 2 is a **new simulation** (different seed, position and
+heading; fresh brain dynamics) with learning switched off and the valence readout on, then 30 s
+of free walking with an odour-only source 10 mm away [measured]:
+
+| condition in experiment 2 | memory strength at test | mean distance | time within 4 mm |
+|---|---|---|---|
+| memory loaded | 100% | **4.1 ± 0.2 mm** | **58%** |
+| memory loaded, τ = 20 s, 10 s delay | ~61% | 4.3 ± 0.1 mm | 44% |
+| memory loaded, τ = 20 s, 60 s delay | ~5% | 18.2 ± 0.3 mm | 0% |
+| no memory | 0 | 19.5 ± 0.6 mm | 0% |
+
+The learned preference survives a complete restart of the simulation. It weakens in a graded
+way as the stored synaptic change decays, and is lost once ~95% of the change has relaxed.
+Real Drosophila memories range from minutes (short-term) to days (long-term, after
+spaced training). τ here is a free parameter, not fitted to those data.
+
 ## 7. Limitations and open questions
 
 - Synaptic weights are proportional to synapse counts with one global scale. Real

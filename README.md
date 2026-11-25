@@ -35,6 +35,8 @@ descending neurons. Silence them, and the corresponding behaviour disappears
 - Associative learning (experimental, `ln_std` preset): odour paired with sugar becomes attractive. The memory forms in
   mushroom-body synapses, and a labelled valence readout turns it into approach. Trained flies spend 57% of the time near the
   learned odour; naive flies and flies given odourless sugar spend 0%.
+- Memory across experiments: learned synapses can be saved, loaded into a new experiment (or carried over on reset)
+  and optionally forgotten over time. A fly trained in one run still finds the learned odour after a full restart.
 - Escape flight: a swooping predator is seen by looming-sensitive LC4/LPLC2 neurons; the connectome
   drives the DNp01 giant fiber, and the fly takes off, flies and lands. With DNp01 silenced, it is caught.
 - Live dashboard: 3D world with click-to-place objects; Brain Explorer with all neurons at

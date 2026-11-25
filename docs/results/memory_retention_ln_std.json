@@ -1,0 +1,110 @@
+[
+ {
+  "condition": "remembered",
+  "seed": 0,
+  "mean_dist": 4.1377533704631535,
+  "frac_near": 0.5386666666666666,
+  "depressed_at_start": 5295,
+  "memory_strength_at_test": 0.04999755908625436,
+  "valence_end": 1.2861781526139244
+ },
+ {
+  "condition": "remembered",
+  "seed": 1,
+  "mean_dist": 4.255459689590236,
+  "frac_near": 0.5356666666666666,
+  "depressed_at_start": 5901,
+  "memory_strength_at_test": 0.05171198335963412,
+  "valence_end": 1.2489333808920415
+ },
+ {
+  "condition": "remembered",
+  "seed": 2,
+  "mean_dist": 3.8980383962328076,
+  "frac_near": 0.6556666666666666,
+  "depressed_at_start": 5277,
+  "memory_strength_at_test": 0.049086102130945775,
+  "valence_end": 1.033985633255343
+ },
+ {
+  "condition": "no_memory",
+  "seed": 0,
+  "mean_dist": 19.06244142460542,
+  "frac_near": 0.0,
+  "depressed_at_start": 0,
+  "memory_strength_at_test": 0.0,
+  "valence_end": 0.04659353241528307
+ },
+ {
+  "condition": "no_memory",
+  "seed": 1,
+  "mean_dist": 20.26449933340198,
+  "frac_near": 0.0,
+  "depressed_at_start": 0,
+  "memory_strength_at_test": 0.0,
+  "valence_end": -0.06308120863382699
+ },
+ {
+  "condition": "no_memory",
+  "seed": 2,
+  "mean_dist": 19.06037518031591,
+  "frac_near": 0.0,
+  "depressed_at_start": 0,
+  "memory_strength_at_test": 0.0,
+  "valence_end": -0.03004431418416107
+ },
+ {
+  "condition": "partly_forgotten",
+  "seed": 0,
+  "mean_dist": 4.442351591489174,
+  "frac_near": 0.36666666666666664,
+  "depressed_at_start": 5295,
+  "memory_strength_at_test": 0.03032505249660722,
+  "valence_end": 0.08296750283738623
+ },
+ {
+  "condition": "partly_forgotten",
+  "seed": 1,
+  "mean_dist": 4.2748456166940745,
+  "frac_near": 0.4196666666666667,
+  "depressed_at_start": 5901,
+  "memory_strength_at_test": 0.031364903382167575,
+  "valence_end": 0.14829505644607927
+ },
+ {
+  "condition": "partly_forgotten",
+  "seed": 2,
+  "mean_dist": 4.183798544393947,
+  "frac_near": 0.5423333333333333,
+  "depressed_at_start": 5277,
+  "memory_strength_at_test": 0.029772225908204275,
+  "valence_end": -0.0006865673122069954
+ },
+ {
+  "condition": "forgotten",
+  "seed": 0,
+  "mean_dist": 17.94557306390101,
+  "frac_near": 0.0,
+  "depressed_at_start": 5295,
+  "memory_strength_at_test": 0.002489231892453647,
+  "valence_end": -0.16804737801289316
+ },
+ {
+  "condition": "forgotten",
+  "seed": 1,
+  "mean_dist": 18.553055622043622,
+  "frac_near": 0.0,
+  "depressed_at_start": 5901,
+  "memory_strength_at_test": 0.0025745880509639996,
+  "valence_end": 0.06446797388416703
+ },
+ {
+  "condition": "forgotten",
+  "seed": 2,
+  "mean_dist": 17.941232732827732,
+  "frac_near": 0.0,
+  "depressed_at_start": 5277,
+  "memory_strength_at_test": 0.0024438531227053417,
+  "valence_end": -0.1948948259905378
+ }
+]

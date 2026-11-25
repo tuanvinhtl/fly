@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Camera, History, Zap } from "lucide-react";
+import { Brain, Camera, History, Trash2, Zap } from "lucide-react";
 import { api } from "../lib/api";
 import { useSim } from "../lib/store";
 import { useBrainInfo } from "../lib/useStatic";
@@ -7,6 +7,7 @@ import { prettyKey } from "../lib/format";
 import { Badge, Button, Card, Field, Input, Select, Slider } from "../components/ui";
 
 interface Snapshot { id: number; label: string; t: number; tick: number; experiment_id: number }
+interface MemoryRow { id: number; name: string; created_at: string; preset: string; source_experiment_id: number | null; source_t: number; depressed: number; mean_weight: number }
 
 export default function LabView({ onError }: { onError: (e: string | null) => void }) {
   const { frame, world } = useSim();
@@ -35,6 +36,15 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
   const [seed, setSeed] = useState(42);
   const [name, setName] = useState("experiment");
   const [preset, setPreset] = useState("al_std");
+  const [keepMemory, setKeepMemory] = useState(false);
+  // memories (level 2)
+  const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [memName, setMemName] = useState("trained on food odour");
+  const [forgetTau, setForgetTau] = useState(0);
+  const loadMemories = () => api.get<MemoryRow[]>("/api/memories").then(setMemories).catch((e: Error) => onError(e.message));
+  useEffect(() => {
+    loadMemories();
+  }, [frame?.experiment_id]); // eslint-disable-line react-hooks/exhaustive-deps
   // snapshots
   const [snaps, setSnaps] = useState<Snapshot[]>([]);
   const loadSnaps = () => api.get<Snapshot[]>("/api/snapshots").then(setSnaps).catch((e: Error) => onError(e.message));
@@ -46,7 +56,7 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
   const selectedPop = sensory.find((p) => p.key === pop);
 
   return (
-    <div className="h-full overflow-y-auto p-3 grid grid-cols-3 gap-3 content-start">
+    <div className="h-full overflow-y-auto p-3 grid grid-cols-3 auto-rows-max gap-3 content-start">
       <Card title="Sensory stimulation" actions={<Zap size={13} className="text-accent" />}>
         <div className="flex flex-col gap-3">
           <Field label="Sensory population (FlyWire-annotated neurons)">
@@ -226,6 +236,62 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
         </div>
       </Card>
 
+      <Card title="Memory (persists across experiments)" actions={<Brain size={13} className="text-violet" />} className="col-span-3">
+        <div className="grid grid-cols-[1fr_1.6fr] gap-4 text-xs">
+          <div className="flex flex-col gap-3">
+            <div className="text-dim">
+              The fly&apos;s learned mushroom-body synapses can be saved and loaded into later experiments. Current memory:{" "}
+              <span className="num text-ink">{frame?.learning.memory ? `${frame.learning.memory.depressed.toLocaleString()} synapses changed` : "none"}</span>
+            </div>
+            <Field label="Name">
+              <Input value={memName} onChange={(e) => setMemName(e.target.value)} />
+            </Field>
+            <Button onClick={() => run(api.post("/api/memories", { name: memName }).then(loadMemories))}>Save current memory</Button>
+            <Field label="Forgetting time constant (s, 0 = never forget)" hint="Learned weights relax back with this time constant, also while learning is off.">
+              <div className="flex gap-2">
+                <Input type="number" min={0} value={forgetTau} onChange={(e) => setForgetTau(Number(e.target.value))} className="flex-1" />
+                <Button onClick={() => run(api.post("/api/learning", { forget_tau_s: forgetTau }))}>Apply</Button>
+              </div>
+            </Field>
+          </div>
+          <div className="rounded border border-line max-h-56 overflow-y-auto">
+            {memories.length === 0 ? (
+              <div className="p-3 text-faint">No saved memories yet.</div>
+            ) : (
+              <table className="w-full">
+                <thead className="sticky top-0 bg-panel text-faint">
+                  <tr className="h-7">
+                    <th className="text-left font-normal pl-2">#</th>
+                    <th className="text-left font-normal">name</th>
+                    <th className="text-right font-normal">synapses</th>
+                    <th className="text-right font-normal">from exp</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {memories.map((m) => (
+                    <tr key={m.id} className="h-7 border-t border-line">
+                      <td className="num pl-2 text-dim">{m.id}</td>
+                      <td className="truncate max-w-40">{m.name} <span className="text-faint">· {m.preset}</span></td>
+                      <td className="num text-right">{m.depressed.toLocaleString()}</td>
+                      <td className="num text-right">{m.source_experiment_id ?? "—"}</td>
+                      <td className="text-right pr-1">
+                        <Button size="sm" variant="ghost" title="Start a new experiment with this memory" onClick={() => run(api.post("/api/sim/reset", { seed, name: `${name} (memory #${m.id})`, preset, world, memory_id: m.id }))}>
+                          <History size={12} /> start with
+                        </Button>
+                        <Button size="icon" variant="ghost" title="Delete" onClick={() => run(api.del(`/api/memories/${m.id}`).then(loadMemories))}>
+                          <Trash2 size={12} />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </Card>
+
       <Card title="New experiment" className="col-span-3">
         <div className="grid grid-cols-5 gap-3 items-end">
           <Field label="Name">
@@ -241,11 +307,15 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
               <option value="exact">exact — Shiu 2024 unmodified</option>
             </Select>
           </Field>
-          <Button variant="accent" onClick={() => run(api.post("/api/sim/reset", { seed, name, preset, world }))}>
+          <Button variant="accent" onClick={() => run(api.post("/api/sim/reset", { seed, name, preset, world, keep_memory: keepMemory }))}>
             Reset with current world
           </Button>
-          <Button onClick={() => run(api.post("/api/sim/reset", { seed, name, preset, default_world: true }))}>Reset with default world</Button>
+          <Button onClick={() => run(api.post("/api/sim/reset", { seed, name, preset, default_world: true, keep_memory: keepMemory }))}>Reset with default world</Button>
         </div>
+        <label className="flex items-center gap-2 text-xs mt-3">
+          <input type="checkbox" checked={keepMemory} onChange={(e) => setKeepMemory(e.target.checked)} />
+          <span>Keep the fly&apos;s memory (learned synapses) in the new experiment — it is saved automatically so the run stays replayable</span>
+        </label>
         {info && <p className="text-[11px] text-faint mt-3">{info.presets[preset]?.description} Deviation: {info.presets[preset]?.deviation_from_publication}</p>}
       </Card>
     </div>

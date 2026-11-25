@@ -119,6 +119,7 @@ frame and never hold the lock across `await`.
 | `samples` | 10 Hz organism state: pose, speed, energy, health, motor command, DN rates, active sensory rates |
 | `events` | every timeline event: t, tick, category, name, data |
 | `commands` | every applied command with its tick, so the run can be replayed |
+| `memories` | saved mushroom-body memories: KC→MBON weight scales (float32) plus provenance and a connectome signature |
 
 SQLite is the default for local development and tests. PostgreSQL is used under Docker and
 has been tested with `DLL_TEST_DATABASE_URL=postgresql+psycopg://…`.

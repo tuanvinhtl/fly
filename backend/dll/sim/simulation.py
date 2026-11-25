@@ -225,10 +225,15 @@ class Simulation:
                 self.valence_on = bool(cmd["valence"])
                 if self.valence_on and self.valence is None:
                     self.valence = self._make_valence()
+            if "forget_tau_s" in cmd:
+                import dataclasses
+
+                mb = self._ensure_plasticity()
+                mb.p = dataclasses.replace(mb.p, tau_forget=max(0.0, float(cmd["forget_tau_s"])))
             if "plasticity" in cmd:
                 self.plasticity_on = bool(cmd["plasticity"])
-                if self.plasticity_on and self.plasticity is None:
-                    self.plasticity = MushroomBodyPlasticity(self.c)
+                if self.plasticity_on:
+                    self._ensure_plasticity()
         self._event("environment" if op.startswith("world") else "experiment", op, {k: v for k, v in cmd.items() if k != "op"})
 
     # ------------------------------------------------------------------ events
@@ -322,6 +327,8 @@ class Simulation:
         self.sensory_rates = {k: rates.get(k, 0.0) for k in self.sensory_pops}
         if self.plasticity_on and self.plasticity is not None:
             self.plasticity.update(brain, nz, cnt, self.TICK)
+        if self.plasticity is not None:
+            self.plasticity.forget(brain, self.TICK)
         if self.valence_on and self.valence is not None:
             self.valence.observe(nz, cnt, self.TICK)
 
@@ -401,6 +408,31 @@ class Simulation:
         self.last_reading, self.last_cmd = reading, cmd
         self.tick_count += 1
 
+    # ------------------------------------------------------------------ memory (level 2)
+    def _ensure_plasticity(self) -> MushroomBodyPlasticity:
+        if self.plasticity is None:
+            self.plasticity = MushroomBodyPlasticity(self.c)
+        return self.plasticity
+
+    def export_memory(self) -> np.ndarray:
+        """KC->MBON weight scales (ones if nothing was learned)."""
+        return self._ensure_plasticity().scale.copy()
+
+    def import_memory(self, scale: np.ndarray) -> None:
+        mb = self._ensure_plasticity()
+        if scale.shape != mb.scale.shape:
+            raise ValueError("memory does not match this connectome's KC->MBON synapses")
+        mb.scale = np.clip(scale.astype(np.float64), mb.p.w_min, 1.0)
+        mb.apply_to(self.brain)
+        self._event("experiment", "memory.loaded", {"depressed": int((mb.scale < 0.99).sum())})
+
+    def memory_signature(self) -> str:
+        """Identifies the plastic synapse set, so memories are only loaded where they fit."""
+        import hashlib
+
+        mb = self._ensure_plasticity()
+        return hashlib.sha256(np.ascontiguousarray(mb.conn).tobytes() + str(self.c.n_connections).encode()).hexdigest()
+
     def _make_valence(self) -> ValenceReadout:
         from ..config import load_settings
 
@@ -456,7 +488,10 @@ class Simulation:
             "habituation": dict(self.habituation.gains),
             "learning": (self.habituation_on, self.plasticity_on),
             "valence": None if self.valence is None else self.valence.value,
-            "mb": None if self.plasticity is None else (self.plasticity.scale.copy(), self.plasticity.elig.copy(), self.plasticity.n_updates),
+            "mb": None if self.plasticity is None else (
+                self.plasticity.scale.copy(), self.plasticity.elig.copy(), self.plasticity.n_updates,
+                self.plasticity.p, self.plasticity._forget_acc,
+            ),
             "organism_params": self.organism.params,
             "command_log": list(self.command_log),
             "n_events": len(self.events),
@@ -494,7 +529,9 @@ class Simulation:
         if snap.get("mb") is not None:
             if self.plasticity is None:
                 self.plasticity = MushroomBodyPlasticity(self.c)
-            self.plasticity.scale, self.plasticity.elig, self.plasticity.n_updates = snap["mb"][0].copy(), snap["mb"][1].copy(), snap["mb"][2]
+            mb = snap["mb"]
+            self.plasticity.scale, self.plasticity.elig, self.plasticity.n_updates = mb[0].copy(), mb[1].copy(), mb[2]
+            self.plasticity.p, self.plasticity._forget_acc = mb[3], mb[4]
         self.command_log = list(snap["command_log"])
         self.events = self.events[: snap["n_events"]]
         self.pending.clear()

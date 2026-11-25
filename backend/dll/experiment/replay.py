@@ -25,8 +25,12 @@ def rerun(
     duration_s: float,
     engine: str = "numba",
     sample_every: int = 10,
+    initial_memory: np.ndarray | None = None,
 ) -> tuple[Simulation, list[tuple[float, float, float]]]:
     sim = Simulation(connectome, preset=preset, seed=seed, world=WorldConfig.model_validate(initial_world), engine=engine)
+    if initial_memory is not None:
+        sim.import_memory(initial_memory)
+        sim.events.clear()
     by_tick: dict[int, list[dict]] = defaultdict(list)
     for c in commands:
         by_tick[int(c["tick"])].append({k: v for k, v in c.items() if k not in _DERIVED})

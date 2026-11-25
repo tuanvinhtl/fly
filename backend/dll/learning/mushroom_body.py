@@ -18,7 +18,7 @@ What is ours (EXPERIMENTAL / APPROXIMATION):
     sensory rate. This stands in for pathways missing from the model.
   * Rule:  dw_kj = -eta * e_k * D_j * dt   (w = multiplicative scale, floored at w_min),
     with e_k an exponentially filtered KC spike count (tau_elig) and D_j in Hz.
-    Optional slow recovery toward 1 (forgetting) with tau_forget.
+    Optional passive forgetting: weights relax toward 1 with time constant tau_forget.
 
 Nothing here touches behaviour directly: learned changes act only by altering MBON firing,
 which reaches descending neurons through whatever wiring the connectome provides.
@@ -82,6 +82,7 @@ class MushroomBodyPlasticity:
         self.scale = np.ones(self.conn.size)
         self.dopamine = np.zeros(self.mbon.size)  # Hz per MBON compartment (last tick)
         self.n_updates = 0
+        self._forget_acc = 0.0
         log.info(
             "MB plasticity: %d KC->MBON connections, %d MBONs, %d PAM, %d PPL1",
             self.conn.size, self.mbon.size, self.pam.size, self.ppl1.size,
@@ -117,15 +118,28 @@ class MushroomBodyPlasticity:
             dw = p.eta * e * d * dt
             changed = dw > 0
             self.scale[changed] = np.maximum(p.w_min, self.scale[changed] - dw[changed])
-        if p.tau_forget > 0:
-            rec = (1.0 - self.scale) * (dt / p.tau_forget)
-            moved = rec > 1e-9
-            self.scale[moved] += rec[moved]
-            changed |= moved
         if changed.any():
             brain.scale_connections(self.conn[changed], self.scale[changed])
             self.n_updates += 1
         return int(changed.sum())
+
+    def forget(self, brain: LIFBrain, dt: float, every: float = 1.0) -> int:
+        """Passive forgetting: depressed weights relax toward 1 with time constant
+        tau_forget (exact exponential, applied in batches of `every` seconds). Runs whether
+        or not learning is switched on."""
+        if self.p.tau_forget <= 0:
+            return 0
+        self._forget_acc += dt
+        if self._forget_acc < every:
+            return 0
+        k = float(np.exp(-self._forget_acc / self.p.tau_forget))
+        self._forget_acc = 0.0
+        moved = self.scale < 1.0
+        if not moved.any():
+            return 0
+        self.scale[moved] = 1.0 - (1.0 - self.scale[moved]) * k
+        brain.scale_connections(self.conn[moved], self.scale[moved])
+        return int(moved.sum())
 
     def apply_to(self, brain: LIFBrain) -> None:
         """Re-apply learned weights (e.g. after brain.reset())."""
@@ -134,6 +148,7 @@ class MushroomBodyPlasticity:
     def reset(self, keep_memory: bool = False) -> None:
         self.elig[:] = 0
         self.dopamine[:] = 0
+        self._forget_acc = 0.0
         if not keep_memory:
             self.scale[:] = 1.0
             self.n_updates = 0
