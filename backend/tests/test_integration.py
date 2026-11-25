@@ -161,3 +161,36 @@ def test_environment_change_mid_run_reaches_brain(sim):
     assert sim.sensory_rates["temp_hot_left"] > 50
     assert sim.total_spikes_tick > before
     assert math.isclose(sim.world.temperature(0, 0), 37.0)
+
+
+def _loom_trial(sim, silence=None):
+    _fresh(sim, drive=0.0)
+    if silence:
+        sim.submit({"op": "brain.silence", "cell_types": silence})
+    sim.run(0.3)
+    h = sim.body.data.geom_xpos[sim.body.head_geom]
+    sim.submit({"op": "world.add", "kind": "threats", "object": {"id": "hawk", "x": float(h[0]) + 8, "y": float(h[1]) + 6, "z": 15, "speed": 40}})
+    zmax = 0.0
+    for _ in range(400):
+        sim.tick()
+        zmax = max(zmax, float(sim.body.state().position[2]))
+    return zmax, [e.name for e in sim.events]
+
+
+def test_looming_triggers_giant_fiber_escape_flight(sim):
+    """Approaching object -> LC4/LPLC2 -> (connectome) -> DNp01 giant fiber -> take-off."""
+    zmax, names = _loom_trial(sim)
+    assert "vision_looming_left:on" in names or "vision_looming_right:on" in names
+    assert "takeoff" in names
+    assert zmax > 2.5
+    assert "predator.strike" not in names
+    assert "landing" in names  # myogenic flight drive decays and the fly lands
+    assert sim.organism.health == 100
+
+
+def test_escape_requires_giant_fiber(sim):
+    zmax, names = _loom_trial(sim, silence=["DNp01"])
+    assert "takeoff" not in names
+    assert zmax < 1.5
+    assert "predator.strike" in names
+    assert sim.organism.health < 100

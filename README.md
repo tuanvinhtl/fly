@@ -32,6 +32,8 @@ descending neurons. Silence them, and the corresponding behaviour disappears
 - Motor output from DNp09 (forward), DNa02/DNa01 (steering), MDN (backward), DNp01 (escape) and
   MN9 (proboscis), through a tripod-gait VNC approximation.
 - Feeding loop: food contact → sugar neurons → MN9 → proboscis → energy. It fails when MN9 is silenced.
+- Escape flight: a swooping predator is seen by looming-sensitive LC4/LPLC2 neurons; the connectome
+  drives the DNp01 giant fiber, and the fly takes off, flies and lands. With DNp01 silenced, it is caught.
 - Live dashboard: 3D world with click-to-place objects; Brain Explorer with all neurons at
   their FlyWire positions and live spiking; neuron connectivity inspector; experiment lab
   (stimuli, silencing, environment, drive, learning, snapshots); analytics with experiment

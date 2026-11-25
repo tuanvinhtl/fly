@@ -153,7 +153,7 @@ function Vitals() {
       <div>
         <div className="flex items-center justify-between">
           <span className="text-[11px] uppercase tracking-[0.12em] text-dim font-semibold">{o.id}</span>
-          <span className={clsx("text-[11px] font-semibold", o.alive ? "text-good" : "text-bad")}>{o.alive ? (o.feeding ? "FEEDING" : "ALIVE") : `DEAD · ${o.death_cause}`}</span>
+          <span className={clsx("text-[11px] font-semibold", o.alive ? "text-good" : "text-bad")}>{o.alive ? (c.flying ? "FLYING" : o.feeding ? "FEEDING" : "ALIVE") : `DEAD · ${o.death_cause}`}</span>
         </div>
         <div className="mt-2 flex flex-col gap-1.5">
           <Meter label="Energy" value={o.energy} tone={o.energy > 30 ? "good" : o.energy > 10 ? "warn" : "bad"} />
@@ -166,7 +166,8 @@ function Vitals() {
         <Bar label="forward" v={c.forward} />
         <Bar label="turn ←" v={c.turn} />
         <Bar label="proboscis" v={c.proboscis} />
-        {c.escape && <div className="text-xs text-bad mt-1">escape take-off</div>}
+        <Bar label="flight" v={c.flying ? c.flight_power : 0} />
+        {c.flying && <div className="text-xs text-accent mt-1">airborne · altitude {f.body.position[2].toFixed(1)} mm</div>}
       </div>
       <div>
         <div className="text-[11px] uppercase tracking-[0.12em] text-dim font-semibold mb-1.5">Descending neurons (Hz, L / R)</div>

@@ -54,9 +54,9 @@ def leg_xml(leg: str, g: BodyGeometry) -> str:
 
 def obstacles_xml(boxes: list[tuple[str, float, float, float, float, float]]) -> str:
     return "".join(
-        f'\n    <geom name="obs_{name}" type="box" pos="{x} {y} {h / 2}" size="{sx} {sy} {h / 2}" '
-        f'contype="1" conaffinity="1" rgba="0.35 0.38 0.45 1"/>'
-        for name, x, y, sx, sy, h in boxes
+        f'\n    <geom name="obs_{b[0]}" type="box" pos="{b[1]} {b[2]} {(b[6] if len(b) > 6 else 0.0) + b[5] / 2}" '
+        f'size="{b[3]} {b[4]} {b[5] / 2}" contype="1" conaffinity="1" rgba="0.35 0.38 0.45 1"/>'
+        for b in boxes
     )
 
 

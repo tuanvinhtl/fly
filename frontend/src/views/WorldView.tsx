@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Grid, Line, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -7,10 +7,11 @@ import { Crosshair, Eye, MousePointer2, Trash2 } from "lucide-react";
 import { getState, useSim } from "../lib/store";
 import { api } from "../lib/api";
 import { useBodyModel } from "../lib/useStatic";
-import type { GeomSpec, World } from "../lib/types";
+import type { World } from "../lib/types";
 import { Badge, Button, Card } from "../components/ui";
+import FlyModel from "../components/FlyModel";
 
-type Tool = "select" | "food" | "obstacle" | "light" | "hot" | "cold" | "toxic" | "remove";
+type Tool = "select" | "food" | "obstacle" | "light" | "hot" | "cold" | "toxic" | "predator" | "remove";
 
 const TOOLS: { id: Tool; label: string }[] = [
   { id: "select", label: "Inspect" },
@@ -20,6 +21,7 @@ const TOOLS: { id: Tool; label: string }[] = [
   { id: "hot", label: "Hot zone" },
   { id: "cold", label: "Cold zone" },
   { id: "toxic", label: "Toxic" },
+  { id: "predator", label: "Predator" },
   { id: "remove", label: "Remove" },
 ];
 
@@ -37,6 +39,7 @@ export default function WorldView({ onError }: { onError: (e: string | null) => 
     if (tool === "hot") call("zones", { kind: "temperature", x, y, radius: 6, temperature: 38 });
     if (tool === "cold") call("zones", { kind: "temperature", x, y, radius: 6, temperature: 14 });
     if (tool === "toxic") call("zones", { kind: "toxic", x, y, radius: 4, bitter: 1 });
+    if (tool === "predator") call("threats", { x, y, z: 18, speed: 40 });
   };
   const remove = (id: string) => {
     if (tool !== "remove") return;
@@ -74,13 +77,26 @@ export default function WorldView({ onError }: { onError: (e: string | null) => 
         <Canvas camera={{ position: [6, 9, 10], fov: 45, near: 0.05, far: 2000 }} shadows dpr={[1, 2]}>
           <color attach="background" args={["#05070a"]} />
           <fog attach="fog" args={["#05070a", 60, 200]} />
-          <ambientLight intensity={0.35} />
-          <directionalLight position={[30, 60, 20]} intensity={1.1} castShadow shadow-mapSize={[2048, 2048]} />
+          <hemisphereLight args={["#dfe9ff", "#2a1d12", 0.55]} />
+          <directionalLight
+            position={[30, 60, 20]}
+            intensity={1.6}
+            castShadow
+            shadow-mapSize={[4096, 4096]}
+            shadow-bias={-0.0003}
+            shadow-camera-left={-45}
+            shadow-camera-right={45}
+            shadow-camera-top={45}
+            shadow-camera-bottom={-45}
+            shadow-camera-near={1}
+            shadow-camera-far={200}
+          />
+          <directionalLight position={[-20, 15, -30]} intensity={0.35} color="#9fc3ff" />
           <CameraRig follow={follow} />
           {/* simulation is z-up; rotate into three.js y-up */}
           <group rotation={[-Math.PI / 2, 0, 0]}>
             {world && <Arena world={world} onPlace={place} onRemove={remove} tool={tool} />}
-            {model && <Fly geoms={model.geoms} />}
+            {model && <FlyModel geoms={model.geoms} />}
             <Trail />
           </group>
         </Canvas>
@@ -115,81 +131,20 @@ function CameraRig({ follow }: { follow: boolean }) {
     }
     if (follow) camera.position.set(target.current.x + 6, 7, target.current.z + 8);
   }, [follow, camera]);
-  useFrame(() => {
+  useFrame((_, dt) => {
     const f = getState().frame;
     if (!f || !controls.current || !follow) return;
-    const [x, y] = f.body.position;
-    const goal = new THREE.Vector3(x, 0.5, -y);
+    const [x, y, z] = f.body.position;
+    const goal = new THREE.Vector3(x, Math.max(0.5, z), -y);
     const delta = goal.clone().sub(target.current);
-    target.current.add(delta.multiplyScalar(0.15));
+    // frame-rate independent smoothing (~0.12 s time constant); follows altitude in flight
+    target.current.add(delta.multiplyScalar(1 - Math.exp(-Math.min(dt, 0.25) / 0.12)));
     // move camera with the target so the user's orbit offset is preserved
     camera.position.add(delta);
     controls.current.target.copy(target.current);
     controls.current.update();
   });
   return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={0.12} maxPolarAngle={Math.PI * 0.49} />;
-}
-
-function geometryFor(g: GeomSpec): THREE.BufferGeometry {
-  const s = g.size;
-  switch (g.type) {
-    case "sphere":
-      return new THREE.SphereGeometry(s[0], 24, 16);
-    case "ellipsoid": {
-      const geo = new THREE.SphereGeometry(1, 28, 18);
-      geo.scale(s[0], s[1], s[2]);
-      return geo;
-    }
-    case "capsule": {
-      const geo = new THREE.CapsuleGeometry(s[0], 2 * s[1], 6, 12);
-      geo.rotateX(Math.PI / 2); // MuJoCo capsule axis = local z
-      return geo;
-    }
-    case "box":
-      return new THREE.BoxGeometry(2 * s[0], 2 * s[1], 2 * s[2]);
-    default:
-      return new THREE.SphereGeometry(s[0] || 0.05, 12, 8);
-  }
-}
-
-function Fly({ geoms }: { geoms: GeomSpec[] }) {
-  const refs = useRef<Record<string, THREE.Mesh | null>>({});
-  const items = useMemo(
-    () =>
-      geoms.map((g) => ({
-        g,
-        geo: geometryFor(g),
-        mat: new THREE.MeshStandardMaterial({
-          color: new THREE.Color(g.rgba[0], g.rgba[1], g.rgba[2]),
-          transparent: g.rgba[3] < 1,
-          opacity: g.rgba[3],
-          roughness: g.name.startsWith("wing") ? 0.2 : 0.6,
-          metalness: g.name.startsWith("eye") ? 0.3 : 0.05,
-          side: g.name.startsWith("wing") ? THREE.DoubleSide : THREE.FrontSide,
-          depthWrite: g.rgba[3] >= 1,
-        }),
-      })),
-    [geoms],
-  );
-  const q = useMemo(() => new THREE.Quaternion(), []);
-  useFrame(() => {
-    const f = getState().frame;
-    if (!f) return;
-    for (const [name, [p, quat]] of Object.entries(f.body.geoms)) {
-      const m = refs.current[name];
-      if (!m) continue;
-      m.position.set(p[0], p[1], p[2]);
-      q.set(quat[1], quat[2], quat[3], quat[0]);
-      m.quaternion.copy(q);
-    }
-  });
-  return (
-    <group>
-      {items.map(({ g, geo, mat }) => (
-        <mesh key={g.name} ref={(m) => void (refs.current[g.name] = m)} geometry={geo} material={mat} castShadow />
-      ))}
-    </group>
-  );
 }
 
 function Trail() {
@@ -219,7 +174,7 @@ function Arena({ world, onPlace, onRemove, tool }: { world: World; onPlace: (x: 
     <group>
       <mesh position={[0, 0, -0.01]} receiveShadow onPointerDown={click}>
         <planeGeometry args={[2 * a, 2 * a]} />
-        <meshStandardMaterial color="#0d1218" roughness={0.95} />
+        <meshStandardMaterial color="#232b33" roughness={0.85} />
       </mesh>
       <group rotation={[Math.PI / 2, 0, 0]}>
         <Grid args={[2 * a, 2 * a]} cellSize={1} sectionSize={10} cellColor="#141b25" sectionColor="#1f2a3a" fadeDistance={160} infiniteGrid={false} position={[0, 0.001, 0]} />
@@ -230,10 +185,19 @@ function Arena({ world, onPlace, onRemove, tool }: { world: World; onPlace: (x: 
         [a + 0.5, 0, 0.5, a + 1],
         [-a - 0.5, 0, 0.5, a + 1],
       ].map(([x, y, sx, sy], i) => (
-        <mesh key={i} position={[x, y, 1.5]} castShadow receiveShadow>
-          <boxGeometry args={[2 * sx, 2 * sy, 3]} />
-          <meshStandardMaterial color="#1a2230" />
-        </mesh>
+        <group key={i}>
+          <mesh position={[x, y, 10]}>
+            <boxGeometry args={[2 * sx, 2 * sy, 20]} />
+            <meshPhysicalMaterial color="#9ec5ff" transparent opacity={0.07} roughness={0.05} depthWrite={false} />
+          </mesh>
+          <mesh position={[x, y, 0.4]} receiveShadow>
+            <boxGeometry args={[2 * sx, 2 * sy, 0.8]} />
+            <meshStandardMaterial color="#1a2230" />
+          </mesh>
+        </group>
+      ))}
+      {(world.threats ?? []).map((t) => (
+        <Predator key={t.id} id={t.id} radius={t.radius} onPointerDown={hit(t.id)} />
       ))}
       {world.zones.map((z) => (
         <mesh key={z.id} position={[z.x, z.y, 0.005]} onPointerDown={hit(z.id)}>
@@ -277,6 +241,38 @@ function Arena({ world, onPlace, onRemove, tool }: { world: World; onPlace: (x: 
   );
 }
 
+/** Threat sphere + ground shadow; position follows the live world stream. */
+function Predator({ id, radius, onPointerDown }: { id: string; radius: number; onPointerDown: (e: ThreeEvent<PointerEvent>) => void }) {
+  const body = useRef<THREE.Group>(null);
+  const shadow = useRef<THREE.Mesh>(null);
+  useFrame(() => {
+    const t = getState().world?.threats?.find((x) => x.id === id);
+    if (!t || !body.current || !shadow.current) return;
+    body.current.position.set(t.x, t.y, t.z);
+    shadow.current.position.set(t.x, t.y, 0.02);
+    const s = Math.max(0.3, 1.6 - t.z / 20);
+    shadow.current.scale.set(s, s, 1);
+  });
+  return (
+    <>
+      <group ref={body} onPointerDown={onPointerDown}>
+        <mesh castShadow>
+          <sphereGeometry args={[radius, 32, 24]} />
+          <meshPhysicalMaterial color="#141a22" roughness={0.35} clearcoat={0.6} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[radius * 1.25, 0.08, 8, 48]} />
+          <meshBasicMaterial color="#fb7185" />
+        </mesh>
+      </group>
+      <mesh ref={shadow}>
+        <circleGeometry args={[radius, 32]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.45} depthWrite={false} />
+      </mesh>
+    </>
+  );
+}
+
 function Legend() {
   const item = (c: string, l: string) => (
     <span className="flex items-center gap-1.5">
@@ -291,6 +287,7 @@ function Legend() {
       {item("#3b82f6", "cold")}
       {item("#a855f7", "toxic (bitter)")}
       {item("#fde68a", "light")}
+      {item("#fb7185", "predator")}
       {item("#38bdf8", "trajectory")}
     </div>
   );

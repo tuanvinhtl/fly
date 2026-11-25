@@ -35,6 +35,9 @@ class EncoderParams:
     light_rmax: float = 120.0
     light_k: float = 1.0
     touch_rate: float = 150.0
+    loom_rmax: float = 200.0  # Hz on LC4/LPLC2 at full expansion rate
+    loom_ref: float = 4.0  # rad/s angular expansion for full response
+    loom_min: float = 0.3  # rad/s below which the neurons stay silent
 
 
 @dataclass
@@ -54,8 +57,9 @@ class SensoryEngine:
     def __init__(self, params: EncoderParams | None = None):
         self.p = params or EncoderParams()
         self.external: dict[str, float] = {}  # user-applied stimulation, Hz per population
+        self._theta: dict[str, float] = {}  # last angular size of each threat (rad)
 
-    def read(self, world: World, body: FlyBody) -> SensoryReading:
+    def read(self, world: World, body: FlyBody, dt: float = 0.01) -> SensoryReading:
         p = self.p
         r = SensoryReading()
         st = body.state()
@@ -113,6 +117,28 @@ class SensoryEngine:
             r.physical[f"touch_{side}"] = touch[side]
             r.rates[f"touch_head_{side}"] = p.touch_rate * touch[side]
             r.rates[f"mech_jo_{side}"] = 0.0
+
+        # --- looming: angular expansion rate of approaching threats, split by hemifield
+        loom = {LEFT: 0.0, RIGHT: 0.0}
+        seen = set()
+        for th in world.cfg.threats:
+            rel = np.array([th.x, th.y, th.z]) - head
+            d = max(float(np.linalg.norm(rel)), th.radius * 1.05)
+            theta = 2.0 * math.atan(th.radius / d)
+            prev = self._theta.get(th.id, theta)
+            self._theta[th.id] = theta
+            seen.add(th.id)
+            rate = (theta - prev) / dt
+            horiz = float(np.hypot(rel[0], rel[1]))
+            lat = float(np.dot(rel[:2], left_vec)) / horiz if horiz > 1e-6 else 0.0
+            for side, wgt in ((LEFT, 0.5 + 0.5 * lat), (RIGHT, 0.5 - 0.5 * lat)):
+                loom[side] = max(loom[side], wgt * rate)
+        for gone in set(self._theta) - seen:
+            del self._theta[gone]
+        for side in (LEFT, RIGHT):
+            x = (loom[side] - p.loom_min) / p.loom_ref
+            r.physical[f"looming_{side}"] = loom[side]
+            r.rates[f"vision_looming_{side}"] = p.loom_rmax * float(np.clip(x, 0.0, 1.0))
 
         # --- user-applied stimulation adds to the physical drive
         for key, hz in self.external.items():

@@ -74,3 +74,30 @@ def test_vnc_maps_dn_rates():
     assert vnc.command({**base, "dn_steer_high_right": 15}).turn == -0.5
     assert vnc.command({**base, "dn_escape_left": 30}).escape
     assert vnc.command({**base, "mn_proboscis_right": 20}).proboscis == 1.0
+
+
+def test_flight_is_stable_and_lands():
+    from dll.environment.world import World, WorldConfig
+
+    body, vnc = FlyBody(World(WorldConfig()).obstacle_boxes()), VNC()
+    body.reset(heading=math.pi)  # fly toward open arena
+    body.step(500)
+    zmax, min_up, landed = 0.0, 1.0, False
+    for k in range(700):
+        s = body.state()
+        collided = bool(body.head_contacts()) and s.position[2] > 1.2
+        cmd = vnc.update_flight(MotorCommand(0, 0, 5 <= k < 8, 0), {}, 0.01, body.feet_down() or s.position[2] < 0.9, collided)
+        body.set_targets(vnc.joint_targets(cmd, 0.01))
+        if cmd.flying:
+            body.step_flight(50, cmd.flight_power, 0.0)
+            s = body.state()
+            zmax, min_up = max(zmax, s.position[2]), min(min_up, s.upright)
+        elif s.upright < 0.3 and s.position[2] < 1.0:
+            body.righting_torque(50)
+        else:
+            body.step(50)
+            landed = landed or k > 20
+    assert zmax > 2.5
+    assert min_up > 0.5  # stays level while airborne
+    assert landed and not vnc.flying
+    assert body.state().upright > 0.9

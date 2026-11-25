@@ -18,6 +18,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 _ids = itertools.count(1)
+ARENA_HEIGHT = 20.0  # mm, walls + lid
 
 
 def _new_id(prefix: str) -> str:
@@ -62,6 +63,23 @@ class Zone(BaseModel):
     bitter: float = Field(1.0, ge=0, le=5, description="bitter concentration, toxic zones only")
 
 
+class Threat(BaseModel):
+    """A predator-like object that swoops toward the fly (e.g. a bird or a swatter).
+
+    It is a purely physical/visual stimulus: the fly only "knows" about it through the
+    looming signal on its eyes (LC4/LPLC2 neurons). A strike on a fly that is still on
+    the ground causes injury.
+    """
+
+    id: str = Field(default_factory=lambda: _new_id("threat"))
+    x: float
+    y: float
+    z: float = Field(18.0, gt=0, le=19)
+    radius: float = Field(2.5, gt=0.2, le=10)
+    speed: float = Field(40.0, gt=1, le=400, description="mm/s")
+    damage: float = Field(60.0, ge=0, le=100)
+
+
 class WorldConfig(BaseModel):
     arena_half: float = Field(40.0, gt=5, le=500, description="arena half width (mm), walled")
     ambient_temperature: float = Field(25.0, ge=0, le=50)
@@ -70,6 +88,7 @@ class WorldConfig(BaseModel):
     obstacles: list[Obstacle] = Field(default_factory=list)
     lights: list[Light] = Field(default_factory=list)
     zones: list[Zone] = Field(default_factory=list)
+    threats: list[Threat] = Field(default_factory=list)
 
 
 def default_world() -> WorldConfig:
@@ -149,7 +168,7 @@ class World:
             self.version += 1
 
     def remove(self, obj_id: str) -> str:
-        for kind in ("food", "obstacles", "lights", "zones"):
+        for kind in ("food", "obstacles", "lights", "zones", "threats"):
             items = getattr(self.cfg, kind)
             for i, o in enumerate(items):
                 if o.id == obj_id:
@@ -160,7 +179,7 @@ class World:
         raise KeyError(f"no world object with id {obj_id}")
 
     def update(self, obj_id: str, changes: dict) -> None:
-        for kind in ("food", "obstacles", "lights", "zones"):
+        for kind in ("food", "obstacles", "lights", "zones", "threats"):
             for i, o in enumerate(getattr(self.cfg, kind)):
                 if o.id == obj_id:
                     new = o.model_validate({**o.model_dump(), **changes, "id": obj_id})
@@ -171,12 +190,13 @@ class World:
         raise KeyError(f"no world object with id {obj_id}")
 
     def obstacle_boxes(self) -> list[tuple[str, float, float, float, float, float]]:
-        """Obstacles plus the four arena walls as (name, x, y, sx, sy, h)."""
-        a = self.cfg.arena_half
+        """Obstacles plus the four arena walls as (name, x, y, sx, sy, h, z0)."""
+        a, h = self.cfg.arena_half, ARENA_HEIGHT
         walls = [
-            ("wall_n", 0.0, a + 0.5, a + 1, 0.5, 3.0),
-            ("wall_s", 0.0, -a - 0.5, a + 1, 0.5, 3.0),
-            ("wall_e", a + 0.5, 0.0, 0.5, a + 1, 3.0),
-            ("wall_w", -a - 0.5, 0.0, 0.5, a + 1, 3.0),
+            ("wall_n", 0.0, a + 0.5, a + 1, 0.5, h, 0.0),
+            ("wall_s", 0.0, -a - 0.5, a + 1, 0.5, h, 0.0),
+            ("wall_e", a + 0.5, 0.0, 0.5, a + 1, h, 0.0),
+            ("wall_w", -a - 0.5, 0.0, 0.5, a + 1, h, 0.0),
+            ("lid", 0.0, 0.0, a + 1, a + 1, 0.5, h),  # transparent lid keeps a flying fly inside
         ]
-        return walls + [(o.id, o.x, o.y, o.sx, o.sy, o.height) for o in self.cfg.obstacles]
+        return walls + [(o.id, o.x, o.y, o.sx, o.sy, o.height, 0.0) for o in self.cfg.obstacles]

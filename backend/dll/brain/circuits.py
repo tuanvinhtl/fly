@@ -103,6 +103,14 @@ SENSORY_SPECS: tuple[PopulationSpec, ...] = (
         "Head bristle mechanoreceptors (grooming circuits: Hampel et al. 2015; Eichler et al. 2024). Collision of the head drives the ipsilateral set.",
     ),
     PopulationSpec(
+        "vision_looming",
+        "Looming-sensitive visual projection neurons (LC4, LPLC2)",
+        {"cell_type": ["LC4", "LPLC2"]},
+        "literature",
+        "LC4 and LPLC2 encode looming and drive the giant fiber escape (von Reyn et al. 2017; "
+        "Ache et al. 2019). Encoding as a tonic rate proportional to angular expansion rate is an approximation.",
+    ),
+    PopulationSpec(
         "mech_jo",
         "Johnston's organ wind/gravity neurons (JO-CE)",
         {"cell_sub_class": ["wind_gravity"]},
@@ -146,6 +154,13 @@ MOTOR_SPECS: tuple[PopulationSpec, ...] = (
         {"cell_type": ["DNp01"]},
         "literature",
         "von Reyn et al. 2014 Nat Neurosci",
+    ),
+    PopulationSpec(
+        "dn_flight",
+        "DNg02 (wingstroke amplitude, flight power)",
+        {"cell_type": ["DNg02_a", "DNg02_b", "DNg02_c", "DNg02_d", "DNg02_e", "DNg02_f", "DNg02_g", "DNg02_h"]},
+        "literature",
+        "Namiki et al. 2022: DNg02 population regulates wingstroke amplitude",
     ),
     PopulationSpec(
         "mn_proboscis",

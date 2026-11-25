@@ -31,7 +31,7 @@ from ..brain.circuits import MOTOR_SPECS, SENSORY_SPECS, Population, resolve
 from ..brain.connectome import Connectome
 from ..brain.lif import LIFBrain
 from ..brain.presets import build_brain
-from ..environment.world import Food, Light, Obstacle, World, WorldConfig, Zone, default_world
+from ..environment.world import Food, Light, Obstacle, Threat, World, WorldConfig, Zone, default_world
 from ..learning.associative import KCMBONPlasticity
 from ..learning.habituation import Habituation
 from ..sensory.sensors import SensoryEngine, SensoryReading
@@ -39,7 +39,7 @@ from .organism import Organism
 
 log = logging.getLogger(__name__)
 
-_KINDS = {"food": Food, "obstacles": Obstacle, "lights": Light, "zones": Zone}
+_KINDS = {"food": Food, "obstacles": Obstacle, "lights": Light, "zones": Zone, "threats": Threat}
 
 # Events fire when a value crosses `on` and end when it falls below `off`.
 SENSORY_EVENT_ON, SENSORY_EVENT_OFF = 10.0, 5.0
@@ -124,6 +124,7 @@ class Simulation:
         if self.plasticity is not None:
             self.plasticity.reset()
         self.sensors.external.clear()
+        self.sensors._theta.clear()
         self.stim_expiry: dict[str, int] = {}
         self.organism = Organism()
         self.tick_count = 0
@@ -249,7 +250,7 @@ class Simulation:
             self._world_version = self.world.version
 
         # 1-2. sense and encode
-        reading = self.sensors.read(self.world, body)
+        reading = self.sensors.read(self.world, body, self.TICK)
         rates = reading.rates
         if self.habituation_on:
             rates = self.habituation.apply(rates, self.TICK)
@@ -302,16 +303,31 @@ class Simulation:
 
         # 4-6. VNC + body
         cmd = self.vnc.command(self.motor_rates) if org.alive else MotorCommand(0.0, 0.0, False, 0.0)
-        before = body.state().position
+        st0 = body.state()
+        before = st0.position
+        was_flying = self.vnc.flying
+        if org.alive:
+            collided = bool(body.head_contacts()) and st0.position[2] > 1.2
+            cmd = self.vnc.update_flight(cmd, self.motor_rates, self.TICK, body.feet_down() or st0.position[2] < 0.9, collided)
         targets = self.vnc.joint_targets(cmd, self.TICK)
         if not org.alive:
             targets = {k: (0.0 if k.endswith("yaw") else (-0.4 if k.endswith("pitch") else v)) for k, v in targets.items()}
         body.set_targets(targets)
         n_phys = int(round(self.TICK / body.dt))
-        if cmd.escape and not self.last_cmd.escape:
+        if cmd.escape and not self.last_cmd.escape and st0.position[2] < 1.5:
             body.apply_impulse(np.array([0.0, 0.0, 6.0 * body.total_mass * 9810.0]), duration_steps=10)
             n_phys -= 10
-        body.step(n_phys)
+        if cmd.flying:
+            body.step_flight(n_phys, cmd.flight_power, cmd.turn)
+        elif st0.upright < 0.3 and st0.position[2] < 1.0 and org.alive:
+            body.righting_torque(n_phys)
+        else:
+            body.step(n_phys)
+        if cmd.flying and not was_flying:
+            self._event("motor", "takeoff", {"dnp01_hz": round(max(self.motor_rates["dn_escape_left"], self.motor_rates["dn_escape_right"]), 1)})
+        elif was_flying and not cmd.flying:
+            self._event("motor", "landing", {})
+        self._move_threats(body)
         after = body.state()
         step_dist = float(np.linalg.norm(after.position[:2] - before[:2]))
 
@@ -359,6 +375,27 @@ class Simulation:
         self.last_reading, self.last_cmd = reading, cmd
         self.tick_count += 1
 
+    def _move_threats(self, body: FlyBody) -> None:
+        """Threats home in on the fly's head; a hit on a fly still near the ground injures it."""
+        head = body.data.geom_xpos[body.head_geom]
+        for th in list(self.world.cfg.threats):
+            rel = head - np.array([th.x, th.y, th.z])
+            d = float(np.linalg.norm(rel))
+            step = th.speed * self.TICK
+            if d <= th.radius + 0.6:
+                hit = head[2] < 2.0 and not self.vnc.flying
+                if hit:
+                    self.organism.health = max(0.0, self.organism.health - th.damage)
+                self._event("environment", "predator.strike" if hit else "predator.miss", {"id": th.id, "fly_z": round(float(head[2]), 2)})
+                self.world.cfg.threats.remove(th)
+                continue
+            if th.z < 0.6:  # dived into the floor
+                self._event("environment", "predator.miss", {"id": th.id})
+                self.world.cfg.threats.remove(th)
+                continue
+            mv = rel / d * min(step, d)
+            th.x, th.y, th.z = th.x + mv[0], th.y + mv[1], th.z + mv[2]
+
     def run(self, seconds: float) -> None:
         for _ in range(int(round(seconds / self.TICK))):
             self.tick()
@@ -375,7 +412,8 @@ class Simulation:
             "world": self.world.cfg.model_copy(deep=True),
             "world_version": self.world.version,
             "organism": copy.deepcopy(self.organism),
-            "vnc_phase": self.vnc.phase,
+            "vnc": {k: getattr(self.vnc, k) for k in ("phase", "flying", "motor_drive", "wing_phase", "_escape_prev")},
+            "theta": dict(self.sensors._theta),
             "external": dict(self.sensors.external),
             "stim_expiry": dict(self.stim_expiry),
             "motor_rates": dict(self.motor_rates),
@@ -401,7 +439,9 @@ class Simulation:
         self.body.set_state_vector(snap["body"])
         self.body.data.ctrl[:] = snap["ctrl"]
         self.organism = copy.deepcopy(snap["organism"])
-        self.vnc.phase = snap["vnc_phase"]
+        for k, val in snap["vnc"].items():
+            setattr(self.vnc, k, val)
+        self.sensors._theta = dict(snap["theta"])
         self.sensors.external = dict(snap["external"])
         self.stim_expiry = dict(snap["stim_expiry"])
         self.motor_rates = dict(snap["motor_rates"])

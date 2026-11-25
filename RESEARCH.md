@@ -187,6 +187,14 @@ All results use `al_std` on the full brain [measured].
 | same, with DNa02 + DNa01 silenced | no turn (< 5°) |
 | obstacle against the left of the head | left head-bristle channel fires; event logged |
 | ambient temperature raised mid-run | hot-cell drive > 50 Hz, whole-brain spiking increases |
+| predator swooping toward the fly | looming → LC4/LPLC2 (~110 Hz) → **DNp01 giant fiber 60–175 Hz** → take-off, flight, landing; predator misses |
+| same, with DNp01 silenced | no take-off; the predator strikes (health 100 → ~42) |
+
+**Escape pathway** [measured]: driving LC4 or LPLC2 at 50–200 Hz on one side gives DNp01
+37–190 Hz, together with DNp02/DNp04/DNp11/DNp103. This is the connectome counterpart of the
+looming → giant fiber escape (von Reyn et al. 2014, 2017; Ache et al. 2019). DNg02 (flight
+power, Namiki et al. 2022) stays silent in all conditions we tested, so flight power after
+take-off comes from the flight-motor approximation in `body/vnc.py`.
 
 **Behavioural experiment** (`scripts/validate_behavior.py`, 5 seeds × 30 s, food 10 mm away;
 raw data in `docs/results/`):
@@ -223,6 +231,10 @@ them instead of hard-coding food-seeking, which the project brief rules out.
 - The `al_std` parameters were chosen to satisfy two constraints (the attractor ends; the
   validated pathway is preserved). They were not fitted to electrophysiology.
 - Learning modules are hypotheses and are off by default.
+- Flight is quasi-steady force control (lift, thrust, drag, haltere-like PD stabilisation),
+  not wing aerodynamics. Cruise speed is scaled down to the arena (30 mm/s, real flies
+  ~0.5 m/s), and flight ends by decay of the myogenic drive or on collision (no visual obstacle
+  avoidance). In flight the walking steering DNs are assumed to produce yaw.
 
 ## 8. References
 
@@ -232,5 +244,6 @@ Gallio M. et al. (2011) *Cell* 144:614 · Gordon M.D. & Scott K. (2009) *Neuron*
 Hige T. et al. (2015) *Neuron* 88:985 · Kazama H. & Wilson R.I. (2008) *Neuron* 58:401 ·
 Rayshubskiy A. et al. (2024) *eLife* (reviewed preprint 102230) · Braun J. et al. (2024) *Nature*, "Descending networks transform command signals into population motor control" ·
 Schlegel P. et al. (2024) *Nature* 634:139 · Shiu P.K. et al. (2024) *Nature* 634:210 ·
-von Reyn C.R. et al. (2014) *Nat Neurosci* 17:962 · Wang-Chen S. et al. (2024) *Nat Methods* (NeuroMechFly v2).
+von Reyn C.R. et al. (2014) *Nat Neurosci* 17:962 · von Reyn C.R. et al. (2017) *Neuron* 94 ·
+Ache J.M. et al. (2019) *Curr Biol* 29 · Namiki S. et al. (2022) *Nat Commun* (DNg02) · Wang-Chen S. et al. (2024) *Nat Methods* (NeuroMechFly v2).
 Press coverage of Eon Systems: The Register (2026-03-16), The Decoder.

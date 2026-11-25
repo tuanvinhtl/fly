@@ -61,7 +61,10 @@
    contributes nothing.
 6. **VNC**: forward = (DNp09 − MDN)/60 Hz; turn = (DNa02 + 0.3·DNa01)<sub>L−R</sub>/30 Hz;
    escape = DNp01 > 20 Hz; proboscis = MN9/20 Hz. A tripod CPG converts these into 18 leg joint
-   targets plus the proboscis and wing actuators.
+   targets plus the proboscis and wing actuators. A DNp01 burst switches to **flight**: a
+   jump impulse, then quasi-steady lift, thrust and drag with PD attitude control. Power comes
+   from a decaying myogenic drive plus DNg02. The fly lands when power is low and its legs
+   touch down, or when a collision knocks it out of the air.
 7. **Physics**: 50 MuJoCo steps of 0.2 ms.
 8. **Physiology**: metabolism, feeding (proboscis extended **and** labellum on food),
    damage, death. Food is depleted.

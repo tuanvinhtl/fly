@@ -75,6 +75,16 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
           <Button variant="accent" onClick={() => run(api.post("/api/stimulus", { population: pop, rate_hz: rate, duration_s: dur }))}>
             Apply stimulus
           </Button>
+          <Button
+            variant="danger"
+            title="An object swoops down at the fly. It is seen only through looming-sensitive LC4/LPLC2 neurons; escape depends on the giant fiber (DNp01)."
+            onClick={() => {
+              const p = frame?.body.position ?? [0, 0, 0];
+              run(api.post("/api/world/threats", { x: p[0] + 8, y: p[1] + 6, z: 15, speed: 40 }));
+            }}
+          >
+            Release predator (looming threat)
+          </Button>
           {frame && Object.keys(frame.sensory.external).length > 0 && (
             <div className="text-[11px] text-warn">active: {Object.entries(frame.sensory.external).map(([k, v]) => `${prettyKey(k)} ${v} Hz`).join(", ")}</div>
           )}

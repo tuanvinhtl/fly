@@ -169,7 +169,7 @@ def create_app(settings: Settings | None = None, connectome: Connectome | None =
             return {"world_seq": r.world_seq, "world": r.sim.world.cfg.model_dump()}
 
     @app.post("/api/world/{kind}")
-    def add_world(kind: Literal["food", "obstacles", "lights", "zones"], obj: dict[str, Any]) -> dict:
+    def add_world(kind: Literal["food", "obstacles", "lights", "zones", "threats"], obj: dict[str, Any]) -> dict:
         return submit({"op": "world.add", "kind": kind, "object": obj})
 
     @app.patch("/api/world/{obj_id}")
@@ -180,7 +180,7 @@ def create_app(settings: Settings | None = None, connectome: Connectome | None =
     def delete_world(obj_id: str) -> dict:
         r = runner()
         with r.lock:
-            ids = {o.id for k in ("food", "obstacles", "lights", "zones") for o in getattr(r.sim.world.cfg, k)}
+            ids = {o.id for k in ("food", "obstacles", "lights", "zones", "threats") for o in getattr(r.sim.world.cfg, k)}
         if obj_id not in ids:
             raise HTTPException(404, f"no world object {obj_id}")
         return submit({"op": "world.remove", "id": obj_id})

@@ -33,8 +33,9 @@ Test totals: 46 tests (45 fast, plus 1 slow Brian2 comparison), all passing.
    connectome model has no spontaneous activity and no neuromodulation.
 5. **`al_std` is a model change.** Short-term depression on olfactory-system neurons is
    needed to prevent a runaway attractor. The unmodified model remains available as `exact`.
-6. **Body simplifications.** 3-DoF legs, increased joint armature, no adhesion, no flight
-   aerodynamics (escape is an upward impulse plus a wing raise).
+6. **Body simplifications.** 3-DoF legs, increased joint armature, no adhesion. Flight is
+   quasi-steady force control rather than wing aerodynamics; take-off itself comes from the
+   connectome (looming → DNp01). Collision ends a flight; a righting reflex is approximated.
 7. **Speed.** ✅ Real time reached (1.0× with dashboard, 1.5× headless) on 4 CPU cores. Further options: a multi-threaded kernel (the
    integration loop parallelises trivially), or a GPU backend (the Eon repository benchmarks
    CUDA/GeNN implementations of the same model).

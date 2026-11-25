@@ -11,6 +11,10 @@ Mapping (see brain/circuits.py for references):
   turning   = DNa02 (gain 1) + DNa01 (0.3)  -> ipsilateral turn (left DN > right = turn left)
   escape    = DNp01                         -> wing raise + jump impulse
   proboscis = MN9                           -> proboscis extension (motor neuron in brain)
+  flight    = take-off on a DNp01 burst; power from the (myogenic) flight motor, which
+              runs on after take-off and decays (tau = flight_tau), plus DNg02 activity;
+              landing when power is low and the legs touch the ground. In flight the same
+              steering command produces yaw (ASSUMED: DNa01/02 are characterised for walking).
 
 Nothing here knows about food, light or obstacles: it only converts DN rates into
 rhythmic joint targets. All goal-directedness must come from the brain.
@@ -40,6 +44,10 @@ class VNCParams:
     min_drive: float = 0.08  # below this |drive| the legs hold still
     escape_threshold: float = 20.0  # DNp01 Hz
     proboscis_threshold: float = 5.0  # MN9 Hz for full extension at 4x threshold
+    flight_tau: float = 3.0  # s, decay of the self-sustaining flight motor after take-off
+    flight_ref: float = 40.0  # DNg02 Hz giving full flight power
+    land_power: float = 0.35  # below this power the fly lands when its legs touch down
+    wingbeat_vis_hz: float = 22.0  # visual wing-flap rate (real flies: ~200 Hz)
 
 
 @dataclass
@@ -48,15 +56,43 @@ class MotorCommand:
     turn: float  # -1..1 (positive = left)
     escape: bool
     proboscis: float  # 0..1 extension
+    flying: bool = False
+    flight_power: float = 0.0  # 0..1
 
 
 class VNC:
     def __init__(self, params: VNCParams | None = None):
         self.p = params or VNCParams()
-        self.phase = 0.0
+        self.reset()
 
     def reset(self) -> None:
         self.phase = 0.0
+        self.flying = False
+        self.motor_drive = 0.0  # myogenic flight-motor drive
+        self.wing_phase = 0.0
+        self._escape_prev = False
+
+    def update_flight(self, cmd: MotorCommand, rates: dict[str, float], dt: float, feet_down: bool, collided: bool = False) -> MotorCommand:
+        """Advance the flight state machine. `feet_down`: legs touching (or body near) the ground."""
+        p = self.p
+        takeoff = cmd.escape and not self._escape_prev
+        self._escape_prev = cmd.escape
+        if takeoff:
+            self.flying = True
+            self.motor_drive = 1.0
+        if self.flying:
+            self.motor_drive *= float(np.exp(-dt / p.flight_tau))
+            dng02 = 0.5 * (rates.get("dn_flight_left", 0.0) + rates.get("dn_flight_right", 0.0))
+            power = float(np.clip(self.motor_drive + dng02 / p.flight_ref, 0.0, 1.0))
+            if (power < p.land_power and feet_down and not takeoff) or (collided and not takeoff):
+                # landing, or a collision knocks the fly out of the air (no visual
+                # obstacle avoidance is modelled)
+                self.flying = False
+                self.motor_drive = 0.0
+                power = 0.0
+            cmd.flight_power = power
+        cmd.flying = self.flying
+        return cmd
 
     def command(self, rates: dict[str, float]) -> MotorCommand:
         p = self.p
@@ -74,6 +110,17 @@ class VNC:
     def joint_targets(self, cmd: MotorCommand, dt: float) -> dict[str, float]:
         """Advance the CPG by dt and return position targets per actuator (radians)."""
         p = self.p
+        if cmd.flying:
+            self.wing_phase = (self.wing_phase + 2 * math.pi * p.wingbeat_vis_hz * dt) % (2 * math.pi)
+            flap = 0.75 + 0.6 * math.sin(self.wing_phase) * max(0.3, cmd.flight_power)
+            out = {}
+            for leg in LEGS:  # legs hang folded under the body; fore legs forward, hind legs trailing
+                s = 1.0 if leg[0] == "L" else -1.0
+                out[f"{leg}_yaw"] = -s * {"1": 0.35, "2": 0.0, "3": -0.35}[leg[1]]
+                out[f"{leg}_pitch"] = 0.3
+                out[f"{leg}_knee"] = 0.6
+            out.update(proboscis=0.0, wing_L=flap, wing_R=flap)
+            return out
         drive = max(abs(cmd.forward), abs(cmd.turn))
         active = drive > p.min_drive
         if active:

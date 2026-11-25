@@ -202,7 +202,8 @@ class SimulationRunner:
             },
             "motor": {
                 "rates": {k: round(v, 2) for k, v in sim.motor_rates.items()},
-                "command": {"forward": round(c.forward, 3), "turn": round(c.turn, 3), "escape": c.escape, "proboscis": round(c.proboscis, 3)},
+                "command": {"forward": round(c.forward, 3), "turn": round(c.turn, 3), "escape": c.escape, "proboscis": round(c.proboscis, 3),
+                            "flying": c.flying, "flight_power": round(c.flight_power, 3)},
             },
             "sensory": {
                 "rates": {k: round(v, 2) for k, v in sim.sensory_rates.items()},

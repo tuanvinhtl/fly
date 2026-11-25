@@ -37,7 +37,7 @@ export interface Frame {
   error: string | null;
   organism: Organism;
   body: { position: Vec3; heading: number; speed: number; geoms: Record<string, [Vec3, Quat]> };
-  motor: { rates: Record<string, number>; command: { forward: number; turn: number; escape: boolean; proboscis: number } };
+  motor: { rates: Record<string, number>; command: { forward: number; turn: number; escape: boolean; proboscis: number; flying: boolean; flight_power: number } };
   sensory: { rates: Record<string, number>; physical: Record<string, number>; external: Record<string, number> };
   brain: { clusters: number[]; active_idx: number[]; active_cnt: number[]; spikes_tick: number; silenced: number };
   learning: { habituation: boolean; plasticity: boolean };
@@ -48,6 +48,7 @@ export interface Food { id: string; x: number; y: number; radius: number; sugar:
 export interface Obstacle { id: string; x: number; y: number; sx: number; sy: number; height: number }
 export interface Light { id: string; x: number; y: number; intensity: number; d0: number }
 export interface Zone { id: string; kind: "temperature" | "toxic"; x: number; y: number; radius: number; temperature: number; bitter: number }
+export interface Threat { id: string; x: number; y: number; z: number; radius: number; speed: number; damage: number }
 export interface World {
   arena_half: number;
   ambient_temperature: number;
@@ -56,6 +57,7 @@ export interface World {
   obstacles: Obstacle[];
   lights: Light[];
   zones: Zone[];
+  threats: Threat[];
 }
 
 export interface Population { key: string; label: string; side: string; size: number; evidence: "validated" | "literature" | "approximation"; reference: string }
