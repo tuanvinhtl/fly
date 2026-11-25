@@ -52,7 +52,7 @@ Test totals: 46 tests (45 fast, plus 1 slow Brian2 comparison), all passing.
 | 0.3 | MANC-based VNC: DN → premotor → motor neurons through connectome wiring; leg mechanosensory feedback |
 | 0.4 | Visual motion pathway (optic lobe → LPTC → DNs) with a rendered eye model |
 | 0.5 | Multiple organisms; population experiments; parameter sweeps on GPU |
-| — | Learning: compare KC→MBON plasticity against conditioning data before calling it validated |
+| — | Learning: MB memory forms (RESEARCH.md §6b); next, make MBON output reach premotor circuits; persist memories across experiments ("level 2") |
 
 ## How to extend
 

@@ -217,6 +217,11 @@ class SimulationRunner:
                 "spikes_tick": sim.total_spikes_tick,
                 "silenced": int(sim.brain.silenced.sum()),
             },
-            "learning": {"habituation": sim.habituation_on, "plasticity": sim.plasticity_on},
+            "learning": {
+                "habituation": sim.habituation_on,
+                "plasticity": sim.plasticity_on,
+                "memory": sim.plasticity.summary() if sim.plasticity is not None else None,
+                "dopamine_max_hz": round(float(sim.plasticity.dopamine.max()), 1) if sim.plasticity is not None and sim.plasticity.dopamine.size else 0.0,
+            },
             "events": events,
         }

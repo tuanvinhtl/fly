@@ -27,6 +27,15 @@ PRESETS: dict[str, Preset] = {
         "Shiu et al. 2024 LIF model, unmodified.",
         "none",
     ),
+    "ln_std": Preset(
+        "ln_std",
+        "Shiu et al. 2024 + short-term synaptic depression (U=0.4, tau_rec=0.5 s) on antennal-lobe "
+        "local neurons only (ALLN).",
+        "Adds STD to the ~400 antennal-lobe local neurons that form the core of the recurrent "
+        "excitatory attractor (RESEARCH.md §4). No persistent activity for any olfactory or thermal "
+        "input; Kenyon cells respond sparsely and odour-specifically (6-12% active, as in vivo); "
+        "validated gustatory, mechanosensory and looming pathways unchanged.",
+    ),
     "al_std": Preset(
         "al_std",
         "Shiu et al. 2024 + short-term synaptic depression (U=0.4, tau_rec=0.5 s) on antennal-lobe, "
@@ -47,6 +56,12 @@ def build_brain(connectome: Connectome, preset: str, seed: int, engine: str = "n
     if preset == "exact":
         return LIFBrain(connectome, LIFParams(), seed=seed, engine=engine)
     brain = LIFBrain(connectome, LIFParams(std_U=AL_STD_U, std_tau_rec=AL_STD_TAU), seed=seed, engine=engine)
+    if preset == "ln_std":
+        ann = connectome.annotations
+        mask = np.array((ann["cell_class"] == "ALLN") & (ann["super_class"] != "sensory"))
+        brain.set_depression(np.where(mask, AL_STD_U, 0.0))
+        log.info("preset ln_std: depression on %d antennal-lobe local neurons", int(mask.sum()))
+        return brain
     mask = olfactory_system_mask(connectome)
     brain.set_depression(np.where(mask, AL_STD_U, 0.0))
     log.info("preset al_std: depression on %d neurons", int(mask.sum()))

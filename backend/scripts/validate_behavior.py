@@ -32,14 +32,14 @@ from dll.sim.simulation import Simulation  # noqa: E402
 FOOD_XY = (10.0, 0.0)
 
 
-def run(args: tuple[str, int, float]) -> dict:
-    cond, seed, seconds = args
+def run(args: tuple[str, int, float, str]) -> dict:
+    cond, seed, seconds, preset = args
     logging.basicConfig(level=logging.WARNING)
     s = load_settings()
     c = load_connectome(s.raw_dir, s.cache_dir)
     odor = 0.0 if cond == "odor_off" else 1.0
     world = WorldConfig(food=[Food(id="f", x=FOOD_XY[0], y=FOOD_XY[1], radius=2.5, odor=odor, odor_sigma=12, amount=1000)])
-    sim = Simulation(c, preset="al_std", seed=seed, world=world)
+    sim = Simulation(c, preset=preset, seed=seed, world=world)
     if cond == "dnp09_off":
         sim.submit({"op": "brain.silence", "cell_types": ["DNp09"]})
     d, left, right = [], 0, 0
@@ -63,8 +63,9 @@ def main() -> None:
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--procs", type=int, default=3)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--preset", default="al_std")
     a = ap.parse_args()
-    jobs = [(c, s, a.seconds) for c in ("odor_on", "odor_off", "dnp09_off") for s in range(a.seeds)]
+    jobs = [(c, s, a.seconds, a.preset) for c in ("odor_on", "odor_off", "dnp09_off") for s in range(a.seeds)]
     with Pool(a.procs) as pool:
         rows = pool.map(run, jobs)
     for cond in ("odor_on", "odor_off", "dnp09_off"):

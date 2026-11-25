@@ -164,10 +164,28 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
           <label className="flex items-start gap-2">
             <input type="checkbox" checked={!!frame?.learning.plasticity} onChange={(e) => run(api.post("/api/learning", { plasticity: e.target.checked }))} />
             <span>
-              <span className="text-ink">Reward-gated KC→MBON depression</span>
-              <span className="block text-faint">Sugar ingestion depresses synapses from recently active Kenyon cells (hypothesis inspired by Hige et al. 2015; not validated in this model).</span>
+              <span className="text-ink">Associative learning in the mushroom body</span>
+              <span className="block text-faint">
+                Taste releases dopamine (sugar → PAM reward, bitter → PPL1 punishment). Dopamine depresses synapses from recently active Kenyon cells onto
+                the output neurons of its compartment (Hige et al. 2015). Odours present while feeding become remembered.
+              </span>
             </span>
           </label>
+          {frame?.learning.memory && (
+            <div className="rounded border border-line p-2 grid grid-cols-2 gap-x-3 gap-y-1">
+              <span className="text-dim">synapses changed</span>
+              <span className="num text-right">{frame.learning.memory.depressed.toLocaleString()} / {frame.learning.memory.plastic_synapses.toLocaleString()}</span>
+              <span className="text-dim">mean KC→MBON weight</span>
+              <span className="num text-right">{frame.learning.memory.mean_weight.toFixed(3)}</span>
+              <span className="text-dim">dopamine now</span>
+              <span className={`num text-right ${frame.learning.dopamine_max_hz > 0 ? "text-warn" : ""}`}>{frame.learning.dopamine_max_hz.toFixed(0)} Hz</span>
+            </div>
+          )}
+          <p className="text-faint text-[11px]">
+            Use the <span className="text-ink">ln_std</span> preset (New experiment, below): with the default preset the mushroom body is nearly silent.
+            Memories form in the mushroom body output (MBON response to the trained odour drops to ~45%), but do not yet change motor output — see
+            RESEARCH.md §6b.
+          </p>
         </div>
       </Card>
 
@@ -199,7 +217,8 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
           </Field>
           <Field label="Brain model preset">
             <Select value={preset} onChange={(e) => setPreset(e.target.value)}>
-              <option value="al_std">al_std — Shiu 2024 + olfactory STD (default)</option>
+              <option value="al_std">al_std — Shiu 2024 + olfactory-system STD (default)</option>
+              <option value="ln_std">ln_std — AL local-neuron STD (use for learning experiments)</option>
               <option value="exact">exact — Shiu 2024 unmodified</option>
             </Select>
           </Field>

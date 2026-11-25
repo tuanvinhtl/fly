@@ -32,7 +32,7 @@ from ..brain.connectome import Connectome
 from ..brain.lif import LIFBrain
 from ..brain.presets import build_brain
 from ..environment.world import Food, Light, Obstacle, Threat, World, WorldConfig, Zone, default_world
-from ..learning.associative import KCMBONPlasticity
+from ..learning.mushroom_body import MushroomBodyPlasticity
 from ..learning.habituation import Habituation
 from ..sensory.sensors import SensoryEngine, SensoryReading
 from .organism import Organism
@@ -84,7 +84,7 @@ class Simulation:
         self.sensors = SensoryEngine()
         self.vnc = VNC()
         self.habituation = Habituation()
-        self.plasticity: KCMBONPlasticity | None = None
+        self.plasticity: MushroomBodyPlasticity | None = None
         self.habituation_on = False
         self.plasticity_on = False
         self._init_clusters()
@@ -123,6 +123,7 @@ class Simulation:
         self.habituation.reset()
         if self.plasticity is not None:
             self.plasticity.reset()
+        self._reward_latch = False
         self.sensors.external.clear()
         self.sensors._theta.clear()
         self.stim_expiry: dict[str, int] = {}
@@ -216,7 +217,7 @@ class Simulation:
             if "plasticity" in cmd:
                 self.plasticity_on = bool(cmd["plasticity"])
                 if self.plasticity_on and self.plasticity is None:
-                    self.plasticity = KCMBONPlasticity(self.c)
+                    self.plasticity = MushroomBodyPlasticity(self.c)
         self._event("environment" if op.startswith("world") else "experiment", op, {k: v for k, v in cmd.items() if k != "op"})
 
     # ------------------------------------------------------------------ events
@@ -262,6 +263,16 @@ class Simulation:
             if r > 0:
                 idx_parts.append(pop.indices)
                 rate_parts.append(np.full(pop.size, r))
+        if self.plasticity_on and self.plasticity is not None:
+            sugar_hz = max(rates.get("taste_sugar_left", 0.0), rates.get("taste_sugar_right", 0.0))
+            bitter_hz = max(rates.get("taste_bitter_left", 0.0), rates.get("taste_bitter_right", 0.0))
+            for dan_idx, hz in self.plasticity.reinforcement_inputs(sugar_hz, bitter_hz):
+                idx_parts.append(dan_idx)
+                rate_parts.append(np.full(dan_idx.size, hz))
+            reinforcing = sugar_hz > 0 or bitter_hz > 0
+            if reinforcing != self._reward_latch:
+                self._reward_latch = reinforcing
+                self._event("neural", f"dopamine.{'reward' if sugar_hz > 0 else 'punishment'}:{'on' if reinforcing else 'off'}", {})
         drive = org.drive_hz()
         if drive > 0:
             for side_idx in self.drive_pop:
@@ -299,7 +310,7 @@ class Simulation:
             self.motor_rates[key] += alpha * (r_inst - self.motor_rates[key])
         self.sensory_rates = {k: rates.get(k, 0.0) for k in self.sensory_pops}
         if self.plasticity_on and self.plasticity is not None:
-            self.plasticity.observe(brain, self.TICK)
+            self.plasticity.update(brain, nz, cnt, self.TICK)
 
         # 4-6. VNC + body
         cmd = self.vnc.command(self.motor_rates) if org.alive else MotorCommand(0.0, 0.0, False, 0.0)
@@ -340,9 +351,6 @@ class Simulation:
         intake = org.update(self.TICK, cmd, temp, bitter, sugar, food is not None, step_dist)
         if food is not None and intake > 0:
             food.amount = max(0.0, food.amount - intake)
-            if self.plasticity_on and self.plasticity is not None and self.tick_count % 10 == 0:
-                n = self.plasticity.reward(brain)
-                self._event("experiment", "plasticity.reward", {"kcs": n})
             if food.amount <= 0:
                 self._event("environment", "food.depleted", {"id": food.id})
 
@@ -422,6 +430,7 @@ class Simulation:
             "last_cmd": self.last_cmd,
             "habituation": dict(self.habituation.gains),
             "learning": (self.habituation_on, self.plasticity_on),
+            "mb": None if self.plasticity is None else (self.plasticity.scale.copy(), self.plasticity.elig.copy(), self.plasticity.n_updates),
             "organism_params": self.organism.params,
             "command_log": list(self.command_log),
             "n_events": len(self.events),
@@ -452,6 +461,10 @@ class Simulation:
         self.last_cmd = snap["last_cmd"]
         self.habituation.gains = dict(snap["habituation"])
         self.habituation_on, self.plasticity_on = snap["learning"]
+        if snap.get("mb") is not None:
+            if self.plasticity is None:
+                self.plasticity = MushroomBodyPlasticity(self.c)
+            self.plasticity.scale, self.plasticity.elig, self.plasticity.n_updates = snap["mb"][0].copy(), snap["mb"][1].copy(), snap["mb"][2]
         self.command_log = list(snap["command_log"])
         self.events = self.events[: snap["n_events"]]
         self.pending.clear()

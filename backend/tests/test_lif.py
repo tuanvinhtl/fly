@@ -33,7 +33,7 @@ def test_lazy_kernel_matches_dense_stepping_full_brain(connectome):
     for idx in (sugar, orn):
         out = []
         for engine in ("numba", "numpy"):
-            b = build_brain(connectome, "al_std", seed=5, engine=engine)
+            b = build_brain(connectome, "ln_std", seed=5, engine=engine)
             b.set_input_rates(idx, np.full(idx.size, 100.0))
             for _ in range(10):
                 b.step(100)
@@ -95,7 +95,7 @@ def test_sugar_activates_mn9_full_brain(connectome):
     ann = connectome.annotations
     sugar = np.flatnonzero((ann.cell_sub_class == "sugar").to_numpy() & (ann.side == "left").to_numpy())
     mn9 = np.flatnonzero((ann.cell_type == "CB0701").to_numpy())
-    for preset in ("exact", "al_std"):
+    for preset in ("exact", "al_std", "ln_std"):
         b = build_brain(connectome, preset, seed=0)
         b.set_input_rates(sugar, np.full(sugar.size, 100.0))
         b.step(5000)
@@ -118,8 +118,9 @@ def test_exact_model_olfactory_runaway_and_al_std_fix(connectome):
     orn = np.flatnonzero(ann.cell_type.isin(["ORN_DM1", "ORN_DM4"]).to_numpy() & (ann.side == "left").to_numpy())
     exact = build_brain(connectome, "exact", seed=0)
     assert _persistent_spikes(exact, orn) > 10_000
-    fixed = build_brain(connectome, "al_std", seed=0)
-    assert _persistent_spikes(fixed, orn) < 100
+    for preset in ("al_std", "ln_std"):
+        fixed = build_brain(connectome, preset, seed=0)
+        assert _persistent_spikes(fixed, orn) < 100, preset
 
 
 @pytest.mark.slow

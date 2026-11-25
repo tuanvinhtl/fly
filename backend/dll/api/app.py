@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 class ResetRequest(BaseModel):
     seed: int | None = None
     name: str = "experiment"
-    preset: Literal["exact", "al_std"] | None = None
+    preset: Literal["exact", "al_std", "ln_std"] | None = None
     world: WorldConfig | None = None
     default_world: bool = False
 

@@ -216,6 +216,13 @@ class LIFBrain:
         self.weight_scale = scale.copy()
         self._apply_silencing()
 
+    def scale_connections(self, conn: np.ndarray, scale: np.ndarray) -> None:
+        """Set the weight scale of selected connections without touching the other ~15 M
+        (fast path for online plasticity)."""
+        self.weight_scale[conn] = scale
+        pre = np.searchsorted(self.c.indptr, conn, side="right") - 1
+        self._w[conn] = np.where(self.silenced[pre], 0.0, self.base_w[conn] * scale)
+
     def _apply_silencing(self) -> None:
         self._w = self.base_w * self.weight_scale
         if self.silenced.any():

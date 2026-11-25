@@ -151,6 +151,28 @@ and rejected:
 Both presets are selectable. `al_std` is the default for closed-loop work because, without it,
 any odour or temperature input saturates the brain.
 
+### 4.5 A narrower variant: `ln_std` (depression on antennal-lobe local neurons only)
+
+Restricting depression to the ~400 antennal-lobe local neurons (`ALLN`), the attractor core
+identified above, also abolishes persistent activity. It gives 0 persistent spikes for
+food-odour, heat and cold input on either side over 4 seeds, and for all 2,282 ORNs driven
+together. It keeps the validated pathways (sugar → MN9 36/58 Hz, left head touch → left DNa02
+14 Hz, looming → DNp01 150/172 Hz). Unlike `al_std`, it leaves the mushroom body working with
+realistic sparseness [measured]:
+
+| | `al_std` | `ln_std` | in vivo |
+|---|---|---|---|
+| Kenyon cells active per odour | 0.4–0.9% | **6.8–12.2%** | ~5–10% (Turner et al. 2008; Honegger et al. 2011) |
+| KC overlap between two odours (Jaccard) | — | 0.22 | low |
+| MBON population response (odour A / B) | ~0 Hz | 12.6 / 1.1 Hz mean | odour-specific |
+
+**Trade-off.** With `ln_std` in the closed loop, any food odour drives left DNa02 much harder
+than right DNa02 (~22 vs ~0 Hz), so the fly spins left 100% of the time (5 seeds × 30 s; raw data
+in `docs/results/`). Left and right DNa02 receive similar total input (+7,881 vs +8,365
+excitatory synapses), so this is a network-level effect of uniform synaptic weights, not
+missing reconstruction. `al_std` therefore remains the closed-loop default, and `ln_std` is used for
+learning experiments.
+
 ## 5. Sensory → descending-neuron map (measured, before choosing the motor interface)
 
 Each stimulus: one side, 100 Hz Poisson, 0.5 s, `al_std`, no internal drive. Values are DN
@@ -218,6 +240,32 @@ These are the expected limits of a connectome-constrained model with uniform syn
 weights, no neuromodulation, an approximate VNC and a hand-chosen DN mapping. We report
 them instead of hard-coding food-seeking, which the project brief rules out.
 
+## 6b. Associative learning (experimental module)
+
+`learning/mushroom_body.py` implements dopamine-gated depression of KC→MBON synapses
+(Hige et al. 2015). Compartments come from DAN→MBON connectivity: all 96 MBONs receive direct
+DAN synapses, 68 of them from PAM. The model contains no taste → dopamine pathway (strong sugar
+input activates 0 of 307 PAM neurons [measured]), so taste injects reinforcement: sugar drives PAM
+(reward; Liu et al. 2012) and bitter drives PPL1 (punishment; Das et al. 2014) [approximation].
+
+**Differential conditioning** (`scripts/conditioning.py`, `ln_std`, 3 seeds; odour A paired with
+sugar 6×, odour B unpaired; plasticity off during tests; 3 test repetitions) [measured]:
+
+| | learning | control (plasticity off) |
+|---|---|---|
+| MBON response to A (CS+), post / pre | **0.45** | 1.00 |
+| MBON response to B (CS−), post / pre | 0.92 | 0.99 |
+| summed change of DN responses, A / B | 125 / 96 Hz | 126 / 97 Hz |
+
+- **An odour-specific memory forms** in the mushroom body output. The most affected MBONs are
+  MBON07 (α1) and MBON02 (β2β'2a), types implicated experimentally in appetitive memory
+  (Ichinose et al. 2015; Owald et al. 2015). About 8,200 of 62,261 KC→MBON synapses are depressed.
+- **It does not reach behaviour.** Descending-neuron responses change no more than in the
+  control. Anatomical MBON → DN paths exist (2-hop: 1,813 synapses onto DNa02, 970 onto MDN), but
+  silencing all MBONs barely alters DN output in the model. Learned behaviour would need either
+  a model in which MBON signals propagate to premotor circuits (e.g. fitted weights or
+  neuromodulation), or an explicit MBON-valence readout, which would be an approximation.
+
 ## 7. Limitations and open questions
 
 - Synaptic weights are proportional to synapse counts with one global scale. Real
@@ -230,7 +278,8 @@ them instead of hard-coding food-seeking, which the project brief rules out.
   from data.
 - The `al_std` parameters were chosen to satisfy two constraints (the attractor ends; the
   validated pathway is preserved). They were not fitted to electrophysiology.
-- Learning modules are hypotheses and are off by default.
+- Learning modules are off by default. MB plasticity is a literature-based rule with injected
+  reinforcement; it changes MBON responses but not motor output in this model (§6b).
 - Flight is quasi-steady force control (lift, thrust, drag, haltere-like PD stabilisation),
   not wing aerodynamics. Cruise speed is scaled down to the arena (30 mm/s, real flies
   ~0.5 m/s), and flight ends by decay of the myogenic drive or on collision (no visual obstacle
@@ -240,7 +289,8 @@ them instead of hard-coding food-seeking, which the project brief rules out.
 
 Bidaye S.S. et al. (2014) *Science* 344:97 · Bidaye S.S. et al. (2020) *Neuron* 108:469 ·
 Dorkenwald S. et al. (2024) *Nature* 634:124 · Eckstein N. et al. (2024) *Cell* 187 ·
-Gallio M. et al. (2011) *Cell* 144:614 · Gordon M.D. & Scott K. (2009) *Neuron* 61:373 ·
+Gallio M. et al. (2011) *Cell* 144:614 · Das G. et al. (2014) *Curr Biol* 24 · Liu C. et al. (2012) *Nature* 488:512 ·
+Ichinose T. et al. (2015) *eLife* 4 · Owald D. et al. (2015) *Neuron* 86:417 · Turner G.C. et al. (2008) *J Neurophysiol* 99 · Honegger K.S. et al. (2011) *J Neurosci* 31 · Gordon M.D. & Scott K. (2009) *Neuron* 61:373 ·
 Hige T. et al. (2015) *Neuron* 88:985 · Kazama H. & Wilson R.I. (2008) *Neuron* 58:401 ·
 Rayshubskiy A. et al. (2024) *eLife* (reviewed preprint 102230) · Braun J. et al. (2024) *Nature*, "Descending networks transform command signals into population motor control" ·
 Schlegel P. et al. (2024) *Nature* 634:139 · Shiu P.K. et al. (2024) *Nature* 634:210 ·

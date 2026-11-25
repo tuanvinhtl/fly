@@ -40,7 +40,12 @@ export interface Frame {
   motor: { rates: Record<string, number>; command: { forward: number; turn: number; escape: boolean; proboscis: number; flying: boolean; flight_power: number } };
   sensory: { rates: Record<string, number>; physical: Record<string, number>; external: Record<string, number> };
   brain: { clusters: number[]; active_idx: number[]; active_cnt: number[]; spikes_tick: number; silenced: number };
-  learning: { habituation: boolean; plasticity: boolean };
+  learning: {
+    habituation: boolean;
+    plasticity: boolean;
+    memory: { plastic_synapses: number; depressed: number; mean_weight: number; min_weight: number; updates: number } | null;
+    dopamine_max_hz: number;
+  };
   events: SimEvent[];
 }
 
