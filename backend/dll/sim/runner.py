@@ -222,6 +222,9 @@ class SimulationRunner:
                 "plasticity": sim.plasticity_on,
                 "memory": sim.plasticity.summary() if sim.plasticity is not None else None,
                 "dopamine_max_hz": round(float(sim.plasticity.dopamine.max()), 1) if sim.plasticity is not None and sim.plasticity.dopamine.size else 0.0,
+                "valence_on": sim.valence_on,
+                "valence": round(sim.valence.value, 4) if sim.valence is not None else 0.0,
+                "valence_steer": round(sim.valence.last_bias, 3) if sim.valence is not None else 0.0,
             },
             "events": events,
         }

@@ -45,6 +45,9 @@ export interface Frame {
     plasticity: boolean;
     memory: { plastic_synapses: number; depressed: number; mean_weight: number; min_weight: number; updates: number } | null;
     dopamine_max_hz: number;
+    valence_on: boolean;
+    valence: number;
+    valence_steer: number;
   };
   events: SimEvent[];
 }

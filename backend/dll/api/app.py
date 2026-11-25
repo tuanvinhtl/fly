@@ -62,6 +62,7 @@ class AmbientRequest(BaseModel):
 class LearningRequest(BaseModel):
     habituation: bool | None = None
     plasticity: bool | None = None
+    valence: bool | None = None
 
 
 class OrganismRequest(BaseModel):

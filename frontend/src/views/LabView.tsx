@@ -171,6 +171,25 @@ export default function LabView({ onError }: { onError: (e: string | null) => vo
               </span>
             </span>
           </label>
+          <label className="flex items-start gap-2">
+            <input type="checkbox" checked={!!frame?.learning.valence_on} onChange={(e) => run(api.post("/api/learning", { valence: e.target.checked }))} />
+            <span>
+              <span className="text-ink">Mushroom-body valence readout</span>{" "}
+              <Badge tone="approximation">approximation</Badge>
+              <span className="block text-faint">
+                Adds the missing MBON → steering link: approach MBONs (ACh/GABA) minus avoidance MBONs (glutamate), balanced on naive odours (Aso et al. 2014),
+                steers toward the stronger-smelling side when positive, away when negative. First use calibrates (~10 s).
+              </span>
+            </span>
+          </label>
+          {frame?.learning.valence_on && (
+            <div className="rounded border border-line p-2 grid grid-cols-2 gap-x-3 gap-y-1">
+              <span className="text-dim">MB valence V</span>
+              <span className={`num text-right ${frame.learning.valence > 0 ? "text-good" : frame.learning.valence < 0 ? "text-bad" : ""}`}>{frame.learning.valence.toFixed(3)}</span>
+              <span className="text-dim">steering added</span>
+              <span className="num text-right">{frame.learning.valence_steer.toFixed(2)}</span>
+            </div>
+          )}
           {frame?.learning.memory && (
             <div className="rounded border border-line p-2 grid grid-cols-2 gap-x-3 gap-y-1">
               <span className="text-dim">synapses changed</span>

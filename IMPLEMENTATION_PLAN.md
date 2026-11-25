@@ -52,7 +52,7 @@ Test totals: 46 tests (45 fast, plus 1 slow Brian2 comparison), all passing.
 | 0.3 | MANC-based VNC: DN → premotor → motor neurons through connectome wiring; leg mechanosensory feedback |
 | 0.4 | Visual motion pathway (optic lobe → LPTC → DNs) with a rendered eye model |
 | 0.5 | Multiple organisms; population experiments; parameter sweeps on GPU |
-| — | Learning: MB memory forms (RESEARCH.md §6b); next, make MBON output reach premotor circuits; persist memories across experiments ("level 2") |
+| — | Learning: MB memory forms and the valence readout reverses odour value (§6b–c). Learned approach is blocked by odour-evoked saturated steering (AOTU019 asymmetry). Next: noise or adaptation in the steering competition, or a VNC turn mapping with headroom; then persist memories ("level 2") |
 
 ## How to extend
 

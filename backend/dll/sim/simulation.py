@@ -19,6 +19,7 @@ from __future__ import annotations
 import copy
 import logging
 import math
+from pathlib import Path
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
@@ -33,6 +34,7 @@ from ..brain.lif import LIFBrain
 from ..brain.presets import build_brain
 from ..environment.world import Food, Light, Obstacle, Threat, World, WorldConfig, Zone, default_world
 from ..learning.mushroom_body import MushroomBodyPlasticity
+from ..learning.valence import ValenceReadout, load_or_calibrate
 from ..learning.habituation import Habituation
 from ..sensory.sensors import SensoryEngine, SensoryReading
 from .organism import Organism
@@ -87,6 +89,9 @@ class Simulation:
         self.plasticity: MushroomBodyPlasticity | None = None
         self.habituation_on = False
         self.plasticity_on = False
+        self.valence: ValenceReadout | None = None
+        self.valence_on = False
+        self.cache_dir: Path | None = None
         self._init_clusters()
         self.body: FlyBody | None = None
         self.reset(seed)
@@ -124,6 +129,8 @@ class Simulation:
         if self.plasticity is not None:
             self.plasticity.reset()
         self._reward_latch = False
+        if self.valence is not None:
+            self.valence.reset()
         self.sensors.external.clear()
         self.sensors._theta.clear()
         self.stim_expiry: dict[str, int] = {}
@@ -214,6 +221,10 @@ class Simulation:
         elif op == "learning.set":
             if "habituation" in cmd:
                 self.habituation_on = bool(cmd["habituation"])
+            if "valence" in cmd:
+                self.valence_on = bool(cmd["valence"])
+                if self.valence_on and self.valence is None:
+                    self.valence = self._make_valence()
             if "plasticity" in cmd:
                 self.plasticity_on = bool(cmd["plasticity"])
                 if self.plasticity_on and self.plasticity is None:
@@ -311,9 +322,15 @@ class Simulation:
         self.sensory_rates = {k: rates.get(k, 0.0) for k in self.sensory_pops}
         if self.plasticity_on and self.plasticity is not None:
             self.plasticity.update(brain, nz, cnt, self.TICK)
+        if self.valence_on and self.valence is not None:
+            self.valence.observe(nz, cnt, self.TICK)
 
         # 4-6. VNC + body
         cmd = self.vnc.command(self.motor_rates) if org.alive else MotorCommand(0.0, 0.0, False, 0.0)
+        if self.valence_on and self.valence is not None and org.alive:
+            # APPROXIMATION: MB valence -> odour-guided steering (learning/valence.py)
+            bias = self.valence.steering(reading.physical.get("odor_left", 0.0), reading.physical.get("odor_right", 0.0))
+            cmd.turn = float(np.clip(cmd.turn + bias, -1.0, 1.0))
         st0 = body.state()
         before = st0.position
         was_flying = self.vnc.flying
@@ -383,6 +400,13 @@ class Simulation:
         self.last_reading, self.last_cmd = reading, cmd
         self.tick_count += 1
 
+    def _make_valence(self) -> ValenceReadout:
+        from ..config import load_settings
+
+        cache = self.cache_dir or load_settings().cache_dir
+        k_app, k_av = load_or_calibrate(self.c, self.preset, cache, lambda: build_brain(self.c, self.preset, seed=0, engine=self.engine))
+        return ValenceReadout(self.c, k_app, k_av)
+
     def _move_threats(self, body: FlyBody) -> None:
         """Threats home in on the fly's head; a hit on a fly still near the ground injures it."""
         head = body.data.geom_xpos[body.head_geom]
@@ -430,6 +454,7 @@ class Simulation:
             "last_cmd": self.last_cmd,
             "habituation": dict(self.habituation.gains),
             "learning": (self.habituation_on, self.plasticity_on),
+            "valence": None if self.valence is None else self.valence.value,
             "mb": None if self.plasticity is None else (self.plasticity.scale.copy(), self.plasticity.elig.copy(), self.plasticity.n_updates),
             "organism_params": self.organism.params,
             "command_log": list(self.command_log),
@@ -461,6 +486,10 @@ class Simulation:
         self.last_cmd = snap["last_cmd"]
         self.habituation.gains = dict(snap["habituation"])
         self.habituation_on, self.plasticity_on = snap["learning"]
+        if snap.get("valence") is not None:
+            if self.valence is None:
+                self.valence = self._make_valence()
+            self.valence.value = snap["valence"]
         if snap.get("mb") is not None:
             if self.plasticity is None:
                 self.plasticity = MushroomBodyPlasticity(self.c)

@@ -266,6 +266,35 @@ sugar 6×, odour B unpaired; plasticity off during tests; 3 test repetitions) [m
   a model in which MBON signals propagate to premotor circuits (e.g. fitted weights or
   neuromodulation), or an explicit MBON-valence readout, which would be an approximation.
 
+### 6c. Valence readout: from memory to steering (approximation)
+
+`learning/valence.py` adds the MBON → premotor link that the connectome model does not
+express. It uses the population-level rule that glutamatergic MBONs mostly drive avoidance and
+cholinergic/GABAergic MBONs mostly drive approach (Aso et al. 2014b). The two groups are
+balanced on a panel of 6 naive odours. The resulting signal steers toward (V > 0) or away from
+(V < 0) the antenna that smells the odour more strongly.
+
+**Learned approach test** (`scripts/learned_approach.py`, 5 seeds; 6 s held on scented sugar
+food, then 30 s free walking with an odour-only source 10 mm away) [measured]:
+
+| preset | condition | MB valence V after training | mean distance to odour |
+|---|---|---|---|
+| `ln_std` | trained | **+0.64 … +0.88** | 12.6 ± 0.7 mm |
+| `ln_std` | naive | −1.3 … −1.6 | 9.0 ± 0.5 mm |
+| `ln_std` | trained, readout off | — | 9.9 ± 0.4 mm |
+| `al_std` | trained / naive | ≈ 0 (only ~490 synapses change) | 11.6 / 11.6 mm |
+
+- **Learning reliably reverses the odour's value** (`ln_std`, 5/5 seeds): naive flies find this
+  food odour aversive in MBON terms, and reward training makes it attractive.
+- **The behavioural test fails, for identified reasons rather than chance:**
+  - Under `ln_std`, odour drives a saturated left turn. The cause is mutual inhibition between the
+    two AOTU019 neurons, which is asymmetric in the connectome: left → right DNa02 has 216 synapses,
+    right → left has 121. Steering added in the saturated direction is clipped, so the readout acts
+    only one way and the trained flies end up farther away.
+  - Under `al_std`, the mushroom body is too quiet for learning to change V.
+- The memory → valence part therefore works. Turning it into learned approach first needs
+  the odour-evoked steering asymmetry resolved; options are listed in IMPLEMENTATION_PLAN.md.
+
 ## 7. Limitations and open questions
 
 - Synaptic weights are proportional to synapse counts with one global scale. Real
@@ -290,7 +319,7 @@ sugar 6×, odour B unpaired; plasticity off during tests; 3 test repetitions) [m
 Bidaye S.S. et al. (2014) *Science* 344:97 · Bidaye S.S. et al. (2020) *Neuron* 108:469 ·
 Dorkenwald S. et al. (2024) *Nature* 634:124 · Eckstein N. et al. (2024) *Cell* 187 ·
 Gallio M. et al. (2011) *Cell* 144:614 · Das G. et al. (2014) *Curr Biol* 24 · Liu C. et al. (2012) *Nature* 488:512 ·
-Ichinose T. et al. (2015) *eLife* 4 · Owald D. et al. (2015) *Neuron* 86:417 · Turner G.C. et al. (2008) *J Neurophysiol* 99 · Honegger K.S. et al. (2011) *J Neurosci* 31 · Gordon M.D. & Scott K. (2009) *Neuron* 61:373 ·
+Ichinose T. et al. (2015) *eLife* 4 · Aso Y. et al. (2014b) *eLife* 3:e04580 · Owald D. et al. (2015) *Neuron* 86:417 · Turner G.C. et al. (2008) *J Neurophysiol* 99 · Honegger K.S. et al. (2011) *J Neurosci* 31 · Gordon M.D. & Scott K. (2009) *Neuron* 61:373 ·
 Hige T. et al. (2015) *Neuron* 88:985 · Kazama H. & Wilson R.I. (2008) *Neuron* 58:401 ·
 Rayshubskiy A. et al. (2024) *eLife* (reviewed preprint 102230) · Braun J. et al. (2024) *Nature*, "Descending networks transform command signals into population motor control" ·
 Schlegel P. et al. (2024) *Nature* 634:139 · Shiu P.K. et al. (2024) *Nature* 634:210 ·
