@@ -8,6 +8,7 @@ This is a faithful port of the Brian2 model published with Shiu et al. 2024,
     dg/dt = -g / tau                   (unless refractory)
     spike:  v > v_th   ->  v = v_rst, g = 0, refractory for t_rfc
     synapse: g_post += w_syn * signed_synapse_count, after delay t_dly
+             (dropped if the target is refractory — Brian2 semantics, verified in tests)
     external drive: Poisson events add w_syn * f_poi directly to v
 
 Both ODEs are linear, so each step is integrated exactly (Brian2 `method='linear'`).
@@ -22,8 +23,9 @@ as a reference backend (see brian2_ref.py) and the tests compare the two.
 Active-set optimisation (optional, on by default): the model has no spontaneous
 activity, so a neuron at exact rest with no incoming events stays at rest. We only
 integrate neurons that are away from rest; a neuron whose |v - v_0| and |g| both
-fall below `rest_tol` is snapped to rest. With rest_tol = 1e-6 V this changes
-membrane potentials by at most 1 µV (7000x below the 7 mV spike threshold gap).
+fall below `rest_tol` is snapped to rest. With rest_tol = 1e-5 V this changes
+membrane potentials by at most 10 µV (700x below the 7 mV spike-threshold gap); the
+tests check that spike output is unchanged on validated pathways.
 """
 
 from __future__ import annotations
@@ -52,7 +54,7 @@ class LIFParams:
     w_syn: float = 0.275e-3  # weight per synapse — FREE PARAMETER fit by Shiu et al.
     f_poi: float = 250.0  # Poisson input scaling (one event forces a spike)
     dt: float = 1e-4  # Brian2 default clock
-    rest_tol: float = 1e-6  # active-set snap tolerance (0 disables the optimisation)
+    rest_tol: float = 1e-5  # active-set snap tolerance, V (0 disables the optimisation)
     # --- EXTENSION (not in Shiu et al.): short-term synaptic depression -------------
     # Tsodyks-Markram resource model per presynaptic neuron. std_U = 0 disables it and
     # recovers the published model exactly. See RESEARCH.md §4 for why it is needed.
@@ -64,11 +66,11 @@ class LIFParams:
 class LIFState:
     v: np.ndarray
     g: np.ndarray
-    ref_until: np.ndarray  # first step index at which the neuron is no longer refractory
+    ref_until: np.ndarray  # first step at which the neuron integrates and accepts input again
     buffer: np.ndarray  # (delay_steps, N) pending synaptic input
     step: int
     rng_state: dict
-    weight_scale: np.ndarray  # per-connection multiplicative scale (plasticity hook)
+    weight_scale: np.ndarray | None  # per-connection scale; None when all ones (saves 120 MB)
     std_x: np.ndarray
     std_last: np.ndarray
 
@@ -147,7 +149,7 @@ class LIFBrain:
             buffer=self.buffer.copy(),
             step=self.t_step,
             rng_state=self.rng.bit_generator.state,
-            weight_scale=self.weight_scale.copy(),
+            weight_scale=None if np.all(self.weight_scale == 1.0) else self.weight_scale.copy(),
             std_x=self.std_x.copy(),
             std_last=self.std_last.copy(),
         )
@@ -158,7 +160,7 @@ class LIFBrain:
         self.buffer = s.buffer.copy()
         self.t_step = s.step
         self.rng.bit_generator.state = s.rng_state
-        self.set_weight_scale(s.weight_scale)
+        self.set_weight_scale(np.ones(self.c.n_connections) if s.weight_scale is None else s.weight_scale)
         self.std_x, self.std_last = s.std_x.copy(), s.std_last.copy()
         self.active = (np.abs(self.v - self.p.v_0) > 0) | (self.g != 0) | (self.buffer != 0).any(axis=0)
         self._touched_dirty = True
@@ -240,8 +242,11 @@ class LIFBrain:
             # 2. threshold (only non-refractory neurons can cross)
             spk = a[self.v[a] > p.v_th]
             # 3a. delayed synaptic input
+            #     Brian2 discards increments to `(unless refractory)` variables while a
+            #     neuron is refractory, so arrivals at refractory neurons are dropped.
             arrivals = self.buffer[slot]
             hit = np.flatnonzero(arrivals)
+            hit = hit[self.ref_until[hit] <= t]
             self.g[hit] += arrivals[hit]
             self.active[hit] = True
             arrivals[:] = 0.0
@@ -268,7 +273,7 @@ class LIFBrain:
                 # 4. reset
                 self.v[spk] = p.v_rst
                 self.g[spk] = 0.0
-                self.ref_until[spk] = t + 1 + np.where(is_input[spk], 0, self.rfc_steps)
+                self.ref_until[spk] = t + np.where(is_input[spk], 0, self.rfc_steps)
                 self.spike_count[spk] += 1
             if use_active:
                 quiet = a[(np.abs(self.v[a] - p.v_0) < p.rest_tol) & (np.abs(self.g[a]) < p.rest_tol)]

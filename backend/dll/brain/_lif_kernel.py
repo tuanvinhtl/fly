@@ -50,9 +50,12 @@ def lif_steps(
         # 3a. delayed synaptic arrivals
         for q in range(bt_n[slot]):
             j = bt_idx[slot, q]
-            g[j] += buffer[slot, j]
+            arrived = buffer[slot, j]
             buffer[slot, j] = 0.0
             bt_flag[slot, j] = False
+            if ref_until[j] > t:
+                continue  # Brian2 drops input to refractory `(unless refractory)` variables
+            g[j] += arrived
             if not active[j]:
                 active[j] = True
                 act[n_act] = j
@@ -87,7 +90,7 @@ def lif_steps(
                         bt_n[slot] += 1
             v[i] = v_rst
             g[i] = 0.0
-            ref_until[i] = t + 1 + (0 if is_input[i] else rfc_steps)
+            ref_until[i] = t + (0 if is_input[i] else rfc_steps)
             spike_count[i] += 1
             if n_out < spk_out.shape[0]:
                 spk_out[n_out] = i
