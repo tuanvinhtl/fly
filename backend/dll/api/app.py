@@ -230,6 +230,12 @@ def create_app(settings: Settings | None = None, connectome: Connectome | None =
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
 
+    @app.get("/api/body/model")
+    def body_model() -> dict:
+        r = runner()
+        with r.lock:
+            return {"geoms": r.sim.body.geom_specs(), "units": "mm"}
+
     # ------------------------------------------------------------ brain inspection
     @app.get("/api/brain/info")
     def brain_info() -> dict:

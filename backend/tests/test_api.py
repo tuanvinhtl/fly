@@ -24,6 +24,11 @@ def test_status_and_brain_info(client):
     assert any(p["key"] == "mn_proboscis_left" for p in info["motor"])
 
 
+def test_body_model(client):
+    geoms = {g["name"]: g for g in client.get("/api/body/model").json()["geoms"]}
+    assert geoms["head"]["type"] == "sphere" and geoms["L1_femur"]["type"] == "capsule"
+
+
 def test_layout_binary(client):
     body = client.get("/api/brain/layout").content
     n = int.from_bytes(body[:4], "little")

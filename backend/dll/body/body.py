@@ -107,6 +107,22 @@ class FlyBody:
             out[name] = (self.data.geom_xpos[i].round(4).tolist(), quat.round(4).tolist())
         return out
 
+    def geom_specs(self) -> list[dict]:
+        """Static render description of body geoms (MuJoCo conventions: capsule axis = local z)."""
+        names = {0: "plane", 2: "sphere", 3: "capsule", 4: "ellipsoid", 5: "cylinder", 6: "box"}
+        out = []
+        for i in range(self.model.ngeom):
+            name = self.model.geom(i).name
+            if not name or name == "floor" or name.startswith("obs_"):
+                continue
+            out.append({
+                "name": name,
+                "type": names.get(int(self.model.geom_type[i]), "sphere"),
+                "size": self.model.geom_size[i].round(5).tolist(),
+                "rgba": self.model.geom_rgba[i].round(3).tolist(),
+            })
+        return out
+
     def get_state_vector(self) -> np.ndarray:
         size = mujoco.mj_stateSize(self.model, _STATE_SPEC)
         s = np.empty(size)
