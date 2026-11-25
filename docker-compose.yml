@@ -1,0 +1,47 @@
+# Local development stack: PostgreSQL + FastAPI simulation backend + Vite dashboard.
+#   cp .env.example .env && docker compose up --build
+# First start downloads and verifies ~135 MB of connectome data into the `data` volume.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dll}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dll}
+      POSTGRES_DB: ${POSTGRES_DB:-dll}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dll}"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DLL_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dll}:${POSTGRES_PASSWORD:-dll}@db:5432/${POSTGRES_DB:-dll}
+      DLL_DATA_DIR: /data
+      DLL_SEED: ${DLL_SEED:-42}
+      DLL_BRAIN_PRESET: ${DLL_BRAIN_PRESET:-al_std}
+      DLL_BRAIN_ENGINE: ${DLL_BRAIN_ENGINE:-numba}
+      DLL_LOG_LEVEL: ${DLL_LOG_LEVEL:-INFO}
+      DLL_CORS_ORIGINS: http://localhost:5173
+    volumes:
+      - data:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_BACKEND_URL: http://backend:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  data:

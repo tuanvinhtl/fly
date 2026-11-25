@@ -1,4 +1,5 @@
 import dataclasses
+import os
 import time
 
 import pytest
@@ -10,8 +11,9 @@ from dll.config import load_settings
 
 @pytest.fixture(scope="module")
 def client(connectome, tmp_path_factory):
-    db = tmp_path_factory.mktemp("db") / "api.sqlite3"
-    settings = dataclasses.replace(load_settings(), database_url=f"sqlite:///{db}")
+    # DLL_TEST_DATABASE_URL lets CI run this suite against PostgreSQL
+    url = os.environ.get("DLL_TEST_DATABASE_URL") or f"sqlite:///{tmp_path_factory.mktemp('db') / 'api.sqlite3'}"
+    settings = dataclasses.replace(load_settings(), database_url=url)
     with TestClient(create_app(settings, connectome)) as c:
         yield c
 

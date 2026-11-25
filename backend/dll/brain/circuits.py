@@ -100,7 +100,7 @@ SENSORY_SPECS: tuple[PopulationSpec, ...] = (
         "Head bristle mechanosensory neurons",
         {"cell_sub_class": ["head bristle"]},
         "literature",
-        "Head bristle mechanoreceptors (Eichler et al. 2024). Collision of the head drives the ipsilateral set.",
+        "Head bristle mechanoreceptors (grooming circuits: Hampel et al. 2015; Eichler et al. 2024). Collision of the head drives the ipsilateral set.",
     ),
     PopulationSpec(
         "mech_jo",
@@ -117,7 +117,7 @@ MOTOR_SPECS: tuple[PopulationSpec, ...] = (
         "DNp09 (forward walking command)",
         {"cell_type": ["DNp09"]},
         "literature",
-        "Bidaye et al. 2020 (P9 neurons drive forward walking); Sapkal et al. 2024",
+        "Bidaye et al. 2020 (P9 neurons drive forward walking); Braun et al. 2024",
     ),
     PopulationSpec(
         "dn_steer_high",

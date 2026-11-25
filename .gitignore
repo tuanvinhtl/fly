@@ -9,3 +9,4 @@ dist/
 .env
 *.egg-info/
 .venv/
+*.tsbuildinfo
