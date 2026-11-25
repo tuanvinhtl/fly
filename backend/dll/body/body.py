@@ -12,6 +12,9 @@ from .fly_model import LEGS, build_mjcf
 
 log = logging.getLogger(__name__)
 
+# full integration state plus solver warm-start, so snapshot/restore is bit-exact
+_STATE_SPEC = mujoco.mjtState.mjSTATE_INTEGRATION | mujoco.mjtState.mjSTATE_WARMSTART
+
 
 @dataclass
 class BodyState:
@@ -105,11 +108,11 @@ class FlyBody:
         return out
 
     def get_state_vector(self) -> np.ndarray:
-        size = mujoco.mj_stateSize(self.model, mujoco.mjtState.mjSTATE_INTEGRATION)
+        size = mujoco.mj_stateSize(self.model, _STATE_SPEC)
         s = np.empty(size)
-        mujoco.mj_getState(self.model, self.data, s, mujoco.mjtState.mjSTATE_INTEGRATION)
+        mujoco.mj_getState(self.model, self.data, s, _STATE_SPEC)
         return s
 
     def set_state_vector(self, s: np.ndarray) -> None:
-        mujoco.mj_setState(self.model, self.data, s, mujoco.mjtState.mjSTATE_INTEGRATION)
+        mujoco.mj_setState(self.model, self.data, s, _STATE_SPEC)
         mujoco.mj_forward(self.model, self.data)

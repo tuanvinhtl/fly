@@ -119,8 +119,12 @@ def create_app(settings: Settings | None = None, connectome: Connectome | None =
 
     @app.get("/api/status")
     def status() -> dict:
-        f = runner().frame
-        return {k: f.get(k) for k in ("t", "tick", "running", "speed", "realtime_factor", "experiment_id", "error", "organism")}
+        r = runner()
+        with r.lock:
+            sim = r.sim
+            return {"t": round(sim.time, 3), "tick": sim.tick_count, "running": r.running, "speed": r.speed,
+                    "realtime_factor": r.realtime_factor, "experiment_id": r.recorder.experiment_id,
+                    "error": r.last_error, "organism": sim.organism.to_dict()}
 
     @app.post("/api/sim/start")
     @app.post("/api/sim/resume")

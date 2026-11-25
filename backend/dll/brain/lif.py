@@ -73,6 +73,7 @@ class LIFState:
     weight_scale: np.ndarray | None  # per-connection scale; None when all ones (saves 120 MB)
     std_x: np.ndarray
     std_last: np.ndarray
+    spike_count: np.ndarray
 
 
 @dataclass
@@ -152,6 +153,7 @@ class LIFBrain:
             weight_scale=None if np.all(self.weight_scale == 1.0) else self.weight_scale.copy(),
             std_x=self.std_x.copy(),
             std_last=self.std_last.copy(),
+            spike_count=self.spike_count.copy(),
         )
 
     def restore(self, s: LIFState) -> None:
@@ -162,6 +164,7 @@ class LIFBrain:
         self.rng.bit_generator.state = s.rng_state
         self.set_weight_scale(np.ones(self.c.n_connections) if s.weight_scale is None else s.weight_scale)
         self.std_x, self.std_last = s.std_x.copy(), s.std_last.copy()
+        self.spike_count = s.spike_count.copy()
         self.active = (np.abs(self.v - self.p.v_0) > 0) | (self.g != 0) | (self.buffer != 0).any(axis=0)
         self._touched_dirty = True
 

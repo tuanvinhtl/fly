@@ -59,7 +59,7 @@ def test_snapshot_restore_continues_identically(sugar_subnet):
     b.step(500)
     expected = b.spike_count.copy()
     b.restore(snap)
-    b.spike_count = counts0.copy()  # cumulative counters are bookkeeping, not dynamic state
+    np.testing.assert_array_equal(b.spike_count, counts0)
     b.step(500)
     np.testing.assert_array_equal(b.spike_count, expected)
 

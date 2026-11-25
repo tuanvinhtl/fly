@@ -280,8 +280,10 @@ class Simulation:
         alpha = 1 - math.exp(-self.TICK / self.rate_tau)
         inst = np.bincount(self.cluster_id[nz], weights=delta[nz], minlength=len(self.cluster_names))
         self.cluster_rates += alpha * (inst / self.cluster_sizes / self.TICK - self.cluster_rates)
+        silenced = brain.silenced
         for key, pop in self.motor_pops.items():
-            r_inst = float(delta[pop.indices].mean()) / self.TICK
+            # a silenced DN/MN releases no transmitter, so it drives no VNC/muscle output
+            r_inst = float(np.where(silenced[pop.indices], 0, delta[pop.indices]).mean()) / self.TICK
             self.motor_rates[key] += alpha * (r_inst - self.motor_rates[key])
         self.sensory_rates = {k: rates.get(k, 0.0) for k in self.sensory_pops}
         if self.plasticity_on and self.plasticity is not None:

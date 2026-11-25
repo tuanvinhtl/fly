@@ -100,6 +100,9 @@ class SimulationRunner:
     # ------------------------------------------------------------------ controls
     def set_running(self, running: bool) -> None:
         self.running = running
+        if not running:
+            with self.lock:  # waits for an in-flight tick, then publishes the paused state
+                self._publish()
 
     def step(self, n_ticks: int = 1) -> None:
         with self.lock:
